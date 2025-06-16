@@ -1,0 +1,13 @@
+[ ] NAME:Current Task List DESCRIPTION:Root task for conversation __NEW_AGENT__
+-[x] NAME:Project Setup and Architecture DESCRIPTION:Initialize React PWA project with Vite, set up project structure, configure PWA manifest, and establish development environment
+-[x] NAME:Supabase Backend Setup DESCRIPTION:Create Supabase project, design and implement database schema with PostGIS for location data, set up authentication, and configure RLS policies
+-[x] NAME:User Authentication and Profile Management DESCRIPTION:Implement university email verification system, user registration/login flows, and profile management with pickup locations
+-[ ] NAME:Location Services and Map Integration DESCRIPTION:Integrate map services for location selection, implement pickup location management, and set up coordinate handling
+-[ ] NAME:Opt-in System Implementation DESCRIPTION:Build manual and scheduled opt-in functionality with flexible pickup location selection and time window management
+-[ ] NAME:AI Matching Engine with Gemini Integration DESCRIPTION:Implement Google Gemini 1.5 Pro integration for intelligent ride matching, create matching algorithm, and set up Supabase Edge Functions
+-[ ] NAME:Uber API Integration DESCRIPTION:Integrate Uber API for route optimization, ETA calculations, and cost estimation for matched ride groups
+-[ ] NAME:Telegram Bot Development DESCRIPTION:Create Telegram bot for ride notifications, confirmations, and user interactions using Telegraf framework
+-[ ] NAME:Real-time Matching and Notification System DESCRIPTION:Implement real-time matching triggers, notification system via Telegram, and ride confirmation workflows
+-[ ] NAME:Scheduled Functions and Automation DESCRIPTION:Set up Supabase cron jobs for automatic opt-ins, implement retry mechanisms for failed matches, and create cleanup functions
+-[ ] NAME:Testing and Quality Assurance DESCRIPTION:Implement comprehensive unit tests, integration tests, and end-to-end testing for all critical user flows
+-[ ] NAME:Security and Performance Optimization DESCRIPTION:Implement security best practices, optimize performance, add monitoring and logging, and prepare for production deployment
