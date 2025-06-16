@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react'
-import { locationService, LocationResult, LocationError } from '../services/locationService'
+import { locationService } from '../services/locationService'
+import type { LocationResult, GeocodeResult, LocationError } from '../services/locationService'
 
 interface LocationContextType {
   currentLocation: LocationResult | null

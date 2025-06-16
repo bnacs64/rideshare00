@@ -363,6 +363,3 @@ class LocationService {
 // Export singleton instance
 export const locationService = new LocationService()
 export default locationService
-
-// Re-export types for external use
-export { LocationResult, GeocodeResult, LocationError }

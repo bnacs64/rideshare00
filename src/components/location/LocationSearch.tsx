@@ -4,7 +4,8 @@ import { Button } from '../ui/button'
 import { Card, CardContent } from '../ui/card'
 import { Badge } from '../ui/badge'
 import { Search, MapPin, Navigation, Loader2, X } from 'lucide-react'
-import { locationService, GeocodeResult } from '../../services/locationService'
+import { locationService } from '../../services/locationService'
+import type { GeocodeResult } from '../../services/locationService'
 import { cn } from '../../lib/utils'
 
 interface LocationSearchProps {

@@ -22,7 +22,7 @@ import {
   Info
 } from 'lucide-react'
 import { usePickupLocations } from '../hooks/usePickupLocations'
-import { GeocodeResult } from '../services/locationService'
+import type { GeocodeResult } from '../services/locationService'
 
 export const LocationDashboard: React.FC = () => {
   const { user } = useAuth()
