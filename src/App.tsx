@@ -1,0 +1,130 @@
+import React from 'react'
+import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom'
+import { AuthProvider, useAuth } from './contexts/AuthContext'
+import { HomePage } from './pages/HomePage'
+import { LoginPage } from './pages/LoginPage'
+import { RegisterPage } from './pages/RegisterPage'
+import { ProfileSetupPage } from './pages/ProfileSetupPage'
+import { DashboardPage } from './pages/DashboardPage'
+import { ProfilePage } from './pages/ProfilePage'
+import { LocationDashboard } from './pages/LocationDashboard'
+import { OptInPage } from './pages/OptInPage'
+import { RidesPage } from './pages/RidesPage'
+import { LoadingSpinner } from './components/LoadingSpinner'
+import './App.css'
+
+// Protected Route Component
+const ProtectedRoute: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+  const { user, loading } = useAuth()
+
+  if (loading) {
+    return <LoadingSpinner />
+  }
+
+  if (!user) {
+    return <Navigate to="/login" replace />
+  }
+
+  return <>{children}</>
+}
+
+// Public Route Component (redirect to dashboard if already logged in)
+const PublicRoute: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+  const { user, loading } = useAuth()
+
+  if (loading) {
+    return <LoadingSpinner />
+  }
+
+  if (user) {
+    return <Navigate to="/dashboard" replace />
+  }
+
+  return <>{children}</>
+}
+
+function AppRoutes() {
+  return (
+    <Router>
+      <Routes>
+        {/* Public Routes */}
+        <Route path="/" element={<HomePage />} />
+        <Route
+          path="/login"
+          element={
+            <PublicRoute>
+              <LoginPage />
+            </PublicRoute>
+          }
+        />
+        <Route
+          path="/register"
+          element={
+            <PublicRoute>
+              <RegisterPage />
+            </PublicRoute>
+          }
+        />
+        <Route
+          path="/profile-setup"
+          element={<ProfileSetupPage />}
+        />
+
+        {/* Protected Routes */}
+        <Route
+          path="/dashboard"
+          element={
+            <ProtectedRoute>
+              <DashboardPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/profile"
+          element={
+            <ProtectedRoute>
+              <ProfilePage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/locations"
+          element={
+            <ProtectedRoute>
+              <LocationDashboard />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/opt-in"
+          element={
+            <ProtectedRoute>
+              <OptInPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/rides"
+          element={
+            <ProtectedRoute>
+              <RidesPage />
+            </ProtectedRoute>
+          }
+        />
+
+        {/* Catch all route */}
+        <Route path="*" element={<Navigate to="/" replace />} />
+      </Routes>
+    </Router>
+  )
+}
+
+function App() {
+  return (
+    <AuthProvider>
+      <AppRoutes />
+    </AuthProvider>
+  )
+}
+
+export default App

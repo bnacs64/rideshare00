@@ -1,0 +1,5 @@
+packages:
+  - '.'
+  # Future packages can be added here
+  # - 'packages/*'
+  # - 'apps/*'

@@ -1,0 +1,171 @@
+import React, { createContext, useContext, useEffect, useState } from 'react'
+import type { User as SupabaseUser } from '@supabase/supabase-js'
+import { supabase } from '../services/supabase'
+import { userService } from '../services/userService'
+import type { User, AuthContextType } from '../types'
+import { testSupabaseConnection } from '../utils/testConnection'
+
+const AuthContext = createContext<AuthContextType | undefined>(undefined)
+
+export const useAuth = () => {
+  const context = useContext(AuthContext)
+  if (context === undefined) {
+    throw new Error('useAuth must be used within an AuthProvider')
+  }
+  return context
+}
+
+interface AuthProviderProps {
+  children: React.ReactNode
+}
+
+export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
+  const [user, setUser] = useState<User | null>(null)
+  const [loading, setLoading] = useState(true)
+
+  useEffect(() => {
+    // Test Supabase connection on app start
+    testSupabaseConnection()
+
+    // Get initial session
+    const getInitialSession = async () => {
+      const { data: { session } } = await supabase.auth.getSession()
+      if (session?.user) {
+        await fetchUserProfile(session.user)
+      }
+      setLoading(false)
+    }
+
+    getInitialSession()
+
+    // Listen for auth changes
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(
+      async (event, session) => {
+        console.log('Auth state change:', event, session?.user?.email)
+
+        if (session?.user) {
+          await fetchUserProfile(session.user)
+        } else {
+          setUser(null)
+        }
+        setLoading(false)
+      }
+    )
+
+    return () => subscription.unsubscribe()
+  }, [])
+
+  const fetchUserProfile = async (supabaseUser: SupabaseUser) => {
+    try {
+      const { user, error } = await userService.getUserProfile(supabaseUser.id)
+
+      if (error) {
+        console.error('Error fetching user profile:', error)
+        // If user profile doesn't exist, this might be a new user
+        if ((error as any)?.code === 'PGRST116') {
+          console.log('User profile not found - new user needs to complete profile setup')
+        }
+        return
+      }
+
+      if (user) {
+        setUser(user)
+      }
+    } catch (error) {
+      console.error('Error in fetchUserProfile:', error)
+    }
+  }
+
+  const signIn = async (email: string, password: string) => {
+    try {
+      const { error } = await supabase.auth.signInWithPassword({
+        email,
+        password,
+      })
+      return { error }
+    } catch (error) {
+      return { error }
+    }
+  }
+
+  const signUp = async (email: string, password: string) => {
+    try {
+      // Check if email validation bypass is enabled
+      const bypassValidation = import.meta.env.VITE_BYPASS_EMAIL_VALIDATION === 'true'
+
+      // Validate NSU email domain (unless bypassed)
+      if (!bypassValidation && !userService.validateNSUEmail(email)) {
+        const emailDomain = import.meta.env.VITE_NSU_EMAIL_DOMAIN || '@northsouth.edu'
+        return { error: { message: `Please use your NSU email address (${emailDomain})` } }
+      }
+
+      if (bypassValidation) {
+        console.log('🔓 Email domain validation bypassed for development/testing')
+      }
+
+      const { data, error } = await supabase.auth.signUp({
+        email,
+        password,
+      })
+
+      if (error) {
+        console.error('Sign up error:', error)
+        return { error }
+      }
+
+      console.log('Sign up successful:', data.user?.email)
+      return { error: null }
+    } catch (error) {
+      console.error('Sign up exception:', error)
+      return { error }
+    }
+  }
+
+  const signOut = async () => {
+    try {
+      await supabase.auth.signOut()
+      setUser(null)
+    } catch (error) {
+      console.error('Error signing out:', error)
+    }
+  }
+
+  const updateProfile = async (updates: Partial<User>) => {
+    try {
+      if (!user) {
+        return { error: { message: 'No user logged in' } }
+      }
+
+      const { user: updatedUser, error } = await userService.updateUserProfile(user.id, updates)
+
+      if (error) {
+        console.error('Update profile error:', error)
+        return { error }
+      }
+
+      if (updatedUser) {
+        setUser(updatedUser)
+      }
+
+      return { error: null }
+    } catch (error) {
+      console.error('Update profile exception:', error)
+      return { error }
+    }
+  }
+
+  const value: AuthContextType = {
+    user,
+    loading,
+    signIn,
+    signUp,
+    signOut,
+    updateProfile,
+  }
+
+  return (
+    <AuthContext.Provider value={value}>
+      {children}
+    </AuthContext.Provider>
+  )
+}
