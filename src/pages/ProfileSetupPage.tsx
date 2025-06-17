@@ -179,6 +179,13 @@ export const ProfileSetupPage: React.FC = () => {
       })
 
       if (error) {
+        // If the error is about duplicate key (user already exists), redirect to dashboard
+        if (error.message && error.message.includes('duplicate key')) {
+          console.log('User profile already exists, redirecting to dashboard')
+          await refreshUser()
+          navigate('/dashboard')
+          return
+        }
         setError(error.message || 'Failed to create profile')
         setLoading(false)
         return

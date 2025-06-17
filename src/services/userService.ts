@@ -23,6 +23,26 @@ export const userService = {
   // Create user profile after successful registration
   async createUserProfile(data: CreateUserProfileData) {
     try {
+      // First check if user already exists
+      const { data: existingUser } = await supabase
+        .from('users')
+        .select('*')
+        .eq('id', data.id)
+        .single()
+
+      if (existingUser) {
+        console.log('User profile already exists, updating instead of creating')
+        // User exists, update their profile instead
+        return this.updateUserProfile(data.id, {
+          full_name: data.full_name,
+          default_role: data.default_role,
+          home_location_coords: `POINT(${data.home_location_coords[0]} ${data.home_location_coords[1]})`,
+          driver_details: data.driver_details,
+          telegram_user_id: data.telegram_user_id
+        })
+      }
+
+      // User doesn't exist, create new profile
       const { data: user, error } = await supabase
         .from('users')
         .insert({
@@ -30,7 +50,8 @@ export const userService = {
           email: data.email,
           full_name: data.full_name,
           default_role: data.default_role,
-          home_location_coords: `POINT(${data.home_location_coords[0]} ${data.home_location_coords[1]})`,
+          home_location_coords: data.home_location_coords,
+          home_location_address: data.home_location_address,
           driver_details: data.driver_details,
           telegram_user_id: data.telegram_user_id
         })
