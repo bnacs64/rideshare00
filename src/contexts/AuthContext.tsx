@@ -78,17 +78,20 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
             if (session?.user) {
               console.log('Auth state change: user found, fetching profile...')
               setLoading(true) // Set loading when starting profile fetch
-              await fetchUserProfile(session.user)
+
+              // Add a small delay to ensure the session is fully established
+              setTimeout(async () => {
+                await fetchUserProfile(session.user)
+              }, 100)
             } else {
               console.log('Auth state change: no user, setting to null')
               setUser(null)
               setProfileFetched(false)
+              setLoading(false)
             }
           } catch (error) {
             console.error('Error in auth state change handler:', error)
             setUser(null)
-          } finally {
-            console.log('Auth state change: setting loading to false')
             setLoading(false)
           }
         } else {
@@ -113,7 +116,13 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     try {
       console.log('Fetching user profile for:', supabaseUser.email)
 
-      const { user, error } = await userService.getUserProfile(supabaseUser.id)
+      // Add timeout to profile fetching to prevent hanging
+      const profilePromise = userService.getUserProfile(supabaseUser.id)
+      const timeoutPromise = new Promise((_, reject) =>
+        setTimeout(() => reject(new Error('Profile fetch timeout')), 15000)
+      )
+
+      const { user, error } = await Promise.race([profilePromise, timeoutPromise]) as any
 
       if (error) {
         console.error('Error fetching user profile:', error)
@@ -153,10 +162,31 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       }
     } catch (error) {
       console.error('Exception in fetchUserProfile:', error)
-      // On exceptions, set user to null
-      setUser(null)
+
+      // Handle timeout errors differently
+      if (error instanceof Error && error.message.includes('timeout')) {
+        console.log('Profile fetch timed out, creating minimal user state')
+        const minimalUser = {
+          id: supabaseUser.id,
+          email: supabaseUser.email || '',
+          full_name: '',
+          default_role: 'RIDER' as const,
+          home_location_coords: [90.4125, 23.8103] as [number, number],
+          home_location_address: '',
+          driver_details: null,
+          telegram_user_id: null,
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString()
+        }
+        setUser(minimalUser)
+        setProfileFetched(true)
+      } else {
+        // On other exceptions, set user to null
+        setUser(null)
+      }
     } finally {
       setFetchingProfile(false)
+      setLoading(false) // Ensure loading is set to false when profile fetch completes
     }
   }
 

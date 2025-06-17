@@ -60,8 +60,8 @@ export const profileService = {
         p_email: profileData.email,
         p_full_name: profileData.full_name,
         p_default_role: profileData.default_role,
-        p_home_location_lng: profileData.home_location_coords[0], // lng
-        p_home_location_lat: profileData.home_location_coords[1],  // lat
+        p_home_location_lng: profileData.home_location_coords?.[0] || 90.4125, // lng (default to Dhaka)
+        p_home_location_lat: profileData.home_location_coords?.[1] || 23.8103,  // lat (default to Dhaka)
         p_home_location_address: profileData.home_location_address || null,
         p_driver_details: profileData.driver_details || null,
         p_telegram_user_id: profileData.telegram_user_id || null
