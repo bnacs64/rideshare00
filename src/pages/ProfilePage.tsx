@@ -56,7 +56,12 @@ export const ProfilePage: React.FC = () => {
     setSuccess('')
 
     try {
-      const { error } = await updateProfile(formData)
+      const { error } = await updateProfile({
+        ...formData,
+        telegram_user_id: typeof formData.telegram_user_id === 'string'
+          ? parseInt(formData.telegram_user_id) || null
+          : formData.telegram_user_id
+      })
 
       if (error) {
         setError(error.message || 'Failed to update profile')
@@ -77,7 +82,7 @@ export const ProfilePage: React.FC = () => {
       full_name: user.full_name,
       telegram_user_id: user.telegram_user_id || '',
       default_role: user.default_role,
-      driver_details: user.driver_details
+      driver_details: user.driver_details || null
     })
     setEditing(false)
     setError('')

@@ -320,7 +320,7 @@ export const OptInPage: React.FC = () => {
                       )}
                       {pickupLocations.length === 0 && (
                         <LocationSetupGuide
-                          hasHomeLocation={hasHomeLocation}
+                          hasHomeLocation={!!hasHomeLocation}
                           hasPickupLocations={pickupLocations.length > 0}
                           onAddPickupLocation={() => window.open('/profile', '_blank')}
                         />

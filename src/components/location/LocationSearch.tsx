@@ -35,7 +35,7 @@ export const LocationSearch: React.FC<LocationSearchProps> = ({
   const [error, setError] = useState('')
   
   const searchRef = useRef<HTMLDivElement>(null)
-  const debounceRef = useRef<NodeJS.Timeout>()
+  const debounceRef = useRef<NodeJS.Timeout | null>(null)
 
   // Handle search input changes with debouncing
   useEffect(() => {
