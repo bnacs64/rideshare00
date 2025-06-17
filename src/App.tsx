@@ -12,6 +12,8 @@ import { OptInPage } from './pages/OptInPage'
 import { ScheduledOptInsPage } from './pages/ScheduledOptInsPage'
 import { OptInStatusPage } from './pages/OptInStatusPage'
 import { MatchingTestPage } from './pages/MatchingTestPage'
+import { MatchedRidesPage } from './pages/MatchedRidesPage'
+import { MatchingAdminPage } from './pages/MatchingAdminPage'
 import { RidesPage } from './pages/RidesPage'
 import { LoadingSpinner } from './components/LoadingSpinner'
 import './App.css'
@@ -132,6 +134,22 @@ function AppRoutes() {
           element={
             <ProtectedRoute>
               <MatchingTestPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/matched-rides"
+          element={
+            <ProtectedRoute>
+              <MatchedRidesPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/matching-admin"
+          element={
+            <ProtectedRoute>
+              <MatchingAdminPage />
             </ProtectedRoute>
           }
         />

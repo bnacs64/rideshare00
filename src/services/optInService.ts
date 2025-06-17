@@ -1,4 +1,5 @@
 import { supabase } from './supabase'
+import { matchingService } from './matchingService'
 import type { DailyOptIn, ScheduledOptIn, DayOfWeek } from '../types'
 
 export interface CreateDailyOptInData {
@@ -56,6 +57,14 @@ export const optInService = {
       if (error) {
         console.error('Error creating daily opt-in:', error)
         return { optIn: null, error }
+      }
+
+      // Trigger automatic matching for the new opt-in (async, don't wait)
+      if (optIn) {
+        matchingService.triggerAutoMatching(optIn.id).catch(error => {
+          console.error('Error triggering auto-matching:', error)
+          // Don't fail the opt-in creation if matching fails
+        })
       }
 
       return { optIn, error: null }

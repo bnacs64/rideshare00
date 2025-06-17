@@ -31,20 +31,57 @@ export interface RideParticipant {
 
 export const matchingService = {
   /**
-   * Find matches for a specific opt-in
+   * Find matches for a specific opt-in using Edge Function
    */
   async findMatches(optInId: string): Promise<{ matches: MatchingResult['matches']; error?: string }> {
     try {
+      const { data: { session } } = await supabase.auth.getSession()
+
+      if (!session) {
+        return { matches: [], error: 'User not authenticated' }
+      }
+
+      const { data, error } = await supabase.functions.invoke('match-rides', {
+        body: {
+          targetOptInId: optInId,
+          forceMatch: false
+        }
+      })
+
+      if (error) {
+        console.error('Error calling match-rides function:', error)
+        return { matches: [], error: error.message }
+      }
+
+      if (!data.success) {
+        return { matches: [], error: data.error || 'Matching failed' }
+      }
+
+      return { matches: data.matches || [] }
+    } catch (error) {
+      console.error('Error in findMatches:', error)
+      return {
+        matches: [],
+        error: error instanceof Error ? error.message : 'Unknown error occurred'
+      }
+    }
+  },
+
+  /**
+   * Find matches for a specific opt-in using local Gemini service (fallback)
+   */
+  async findMatchesLocal(optInId: string): Promise<{ matches: MatchingResult['matches']; error?: string }> {
+    try {
       // Get the target opt-in with full details
       const { optIn: targetOptIn, error: targetError } = await optInService.getDailyOptIn(optInId)
-      
+
       if (targetError || !targetOptIn) {
         return { matches: [], error: 'Target opt-in not found' }
       }
 
       // Get available opt-ins for the same date (excluding the target)
       const { optIns: availableOptIns, error: availableError } = await optInService.getDailyOptIns(
-        targetOptIn.user_id, 
+        targetOptIn.user_id,
         {
           startDate: targetOptIn.commute_date,
           endDate: targetOptIn.commute_date,
@@ -57,7 +94,7 @@ export const matchingService = {
       }
 
       // Filter out the target opt-in and get other users' opt-ins
-      const otherOptIns = availableOptIns.filter(opt => 
+      const otherOptIns = availableOptIns.filter(opt =>
         opt.id !== optInId && opt.user_id !== targetOptIn.user_id
       )
 
@@ -81,19 +118,24 @@ export const matchingService = {
         nsuLocation: [90.4125, 23.8103] // NSU coordinates
       }
 
-      // Get matches from Gemini AI
-      const result = await geminiService.generateMatches(matchingRequest)
-      
+      // Try Gemini AI first, fallback to local algorithm
+      let result = await geminiService.generateMatches(matchingRequest)
+
+      if (!result.success) {
+        console.log('Gemini AI failed, falling back to local algorithm')
+        result = await geminiService.generateMatchesLocal(matchingRequest)
+      }
+
       if (!result.success) {
         return { matches: [], error: result.error }
       }
 
       return { matches: result.matches }
     } catch (error) {
-      console.error('Error in findMatches:', error)
-      return { 
-        matches: [], 
-        error: error instanceof Error ? error.message : 'Unknown error occurred' 
+      console.error('Error in findMatchesLocal:', error)
+      return {
+        matches: [],
+        error: error instanceof Error ? error.message : 'Unknown error occurred'
       }
     }
   },
@@ -347,9 +389,45 @@ export const matchingService = {
   },
 
   /**
-   * Run matching for all pending opt-ins for a specific date
+   * Run matching for all pending opt-ins for a specific date using Edge Function
    */
   async runDailyMatching(date: string): Promise<{ matchesCreated: number; error?: string }> {
+    try {
+      const { data: { session } } = await supabase.auth.getSession()
+
+      if (!session) {
+        return { matchesCreated: 0, error: 'User not authenticated' }
+      }
+
+      const { data, error } = await supabase.functions.invoke('daily-matching', {
+        body: {
+          date,
+          dryRun: false
+        }
+      })
+
+      if (error) {
+        console.error('Error calling daily-matching function:', error)
+        return { matchesCreated: 0, error: error.message }
+      }
+
+      return {
+        matchesCreated: data.matchesCreated || 0,
+        error: data.error
+      }
+    } catch (error) {
+      console.error('Error in runDailyMatching:', error)
+      return {
+        matchesCreated: 0,
+        error: error instanceof Error ? error.message : 'Unknown error occurred'
+      }
+    }
+  },
+
+  /**
+   * Run matching for all pending opt-ins for a specific date using local service (fallback)
+   */
+  async runDailyMatchingLocal(date: string): Promise<{ matchesCreated: number; error?: string }> {
     try {
       // Get all pending opt-ins for the date
       const { data: optIns, error } = await supabase
@@ -380,13 +458,13 @@ export const matchingService = {
           continue
         }
 
-        const { matches } = await this.findMatches(optIn.id)
-        
+        const { matches } = await this.findMatchesLocal(optIn.id)
+
         // Create rides for good matches (confidence > 70)
         for (const match of matches) {
           if (match.confidence > 70) {
             const { ride, error: createError } = await this.createMatchedRide(match, date)
-            
+
             if (ride && !createError) {
               matchesCreated++
               // Mark all participants as processed
@@ -398,10 +476,43 @@ export const matchingService = {
 
       return { matchesCreated }
     } catch (error) {
-      console.error('Error in runDailyMatching:', error)
-      return { 
-        matchesCreated: 0, 
-        error: error instanceof Error ? error.message : 'Unknown error occurred' 
+      console.error('Error in runDailyMatchingLocal:', error)
+      return {
+        matchesCreated: 0,
+        error: error instanceof Error ? error.message : 'Unknown error occurred'
+      }
+    }
+  },
+
+  /**
+   * Trigger automatic matching for a new opt-in
+   */
+  async triggerAutoMatching(optInId: string): Promise<{ success: boolean; error?: string }> {
+    try {
+      const { data: { session } } = await supabase.auth.getSession()
+
+      if (!session) {
+        return { success: false, error: 'User not authenticated' }
+      }
+
+      const { data, error } = await supabase.functions.invoke('auto-match-trigger', {
+        body: {
+          type: 'opt_in_created',
+          optInId
+        }
+      })
+
+      if (error) {
+        console.error('Error calling auto-match-trigger function:', error)
+        return { success: false, error: error.message }
+      }
+
+      return { success: data.success || false, error: data.error }
+    } catch (error) {
+      console.error('Error in triggerAutoMatching:', error)
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : 'Unknown error occurred'
       }
     }
   }
