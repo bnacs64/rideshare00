@@ -31,6 +31,13 @@
     "test:ride": "node scripts/debugRideCreation.js",
     "fix:db": "node scripts/fixDatabase.js",
     "check:schema": "node scripts/checkSchema.js",
+    "create:profile": "node scripts/createProfileFunction.js",
+    "test:registration": "node scripts/testUserRegistration.js",
+    "check:migrations": "node scripts/checkMigrationStatus.js",
+    "deploy:clean": "node scripts/deployCleanBackend.js",
+    "validate:clean": "node scripts/validateCleanBackend.js",
+    "test:clean": "node scripts/testCleanBackend.js",
+    "test:frontend": "node scripts/testFrontendService.js",
     "test:e2e": "echo 'E2E tests not implemented yet'",
     "fix:email-validation": "node scripts/fixEmailValidation.js"
   },

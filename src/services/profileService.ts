@@ -44,7 +44,7 @@ export interface ProfileServiceResponse<T = any> {
 
 export const profileService = {
   /**
-   * Create a complete user profile using database function
+   * Create a complete user profile using direct database operations
    * This handles all validation, coordinate conversion, and automatic pickup location creation
    */
   async createCompleteProfile(profileData: CreateProfileData): Promise<ProfileServiceResponse<{
@@ -52,9 +52,10 @@ export const profileService = {
     pickup_location_id: string | null
   }>> {
     try {
-      console.log('🔍 Creating complete profile via database function:', profileData)
+      console.log('🔍 Creating complete profile via direct database operations:', profileData)
 
-      const { data, error } = await supabase.rpc('create_complete_user_profile', {
+      // Use the new clean API function
+      const { data, error } = await supabase.rpc('api_create_user_profile', {
         p_user_id: profileData.id,
         p_email: profileData.email,
         p_full_name: profileData.full_name,
@@ -67,85 +68,82 @@ export const profileService = {
       })
 
       if (error) {
-        console.error('❌ Database function error:', error)
+        console.error('❌ Backend API error:', error)
         return { success: false, error: error.message }
       }
 
       if (!data || data.length === 0) {
-        return { success: false, error: 'No data returned from database function' }
+        return { success: false, error: 'No data returned from backend' }
       }
 
       const result = data[0]
-      
+
       if (!result.success) {
         console.error('❌ Profile creation failed:', result.error_message)
         return { success: false, error: result.error_message }
       }
 
-      console.log('✅ Profile created successfully via database function')
-      
+      console.log('✅ Profile created successfully via backend API')
+
       return {
         success: true,
-        data: {
-          user: result.user_data as User,
-          pickup_location_id: result.pickup_location_id
-        }
+        data: result.data
       }
+
+
     } catch (error) {
       console.error('💥 Error in createCompleteProfile:', error)
-      return { 
-        success: false, 
-        error: error instanceof Error ? error.message : 'Unknown error occurred' 
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : 'Unknown error occurred'
       }
     }
   },
 
   /**
-   * Update user profile using database function
-   * Only updates provided fields, handles validation in database
+   * Update user profile using clean API function
+   * TODO: Implement api_update_user_profile function call
    */
   async updateProfile(userId: string, updates: UpdateProfileData): Promise<ProfileServiceResponse<User>> {
     try {
-      console.log('🔍 Updating profile via database function:', { userId, updates })
+      console.log('🔍 Updating profile via backend API:', { userId, updates })
 
-      const { data, error } = await supabase.rpc('update_user_profile', {
-        p_user_id: userId,
-        p_full_name: updates.full_name || null,
-        p_default_role: updates.default_role || null,
-        p_home_location_lng: updates.home_location_coords?.[0] || null, // lng
-        p_home_location_lat: updates.home_location_coords?.[1] || null,  // lat
-        p_home_location_address: updates.home_location_address || null,
-        p_driver_details: updates.driver_details || null,
-        p_telegram_user_id: updates.telegram_user_id || null
-      })
+      // For now, use direct database update until api_update_user_profile is implemented
+      const updateData: any = {}
+
+      if (updates.full_name !== undefined) updateData.full_name = updates.full_name
+      if (updates.default_role !== undefined) updateData.default_role = updates.default_role
+      if (updates.home_location_address !== undefined) updateData.home_location_address = updates.home_location_address
+      if (updates.driver_details !== undefined) updateData.driver_details = updates.driver_details
+      if (updates.telegram_user_id !== undefined) updateData.telegram_user_id = updates.telegram_user_id
+
+      if (updates.home_location_coords) {
+        updateData.home_location_coords = `POINT(${updates.home_location_coords[0]} ${updates.home_location_coords[1]})`
+      }
+
+      const { data, error } = await supabase
+        .from('users')
+        .update(updateData)
+        .eq('id', userId)
+        .select()
+        .single()
 
       if (error) {
-        console.error('❌ Database function error:', error)
+        console.error('❌ Profile update failed:', error)
         return { success: false, error: error.message }
       }
 
-      if (!data || data.length === 0) {
-        return { success: false, error: 'No data returned from database function' }
-      }
+      console.log('✅ Profile updated successfully')
 
-      const result = data[0]
-      
-      if (!result.success) {
-        console.error('❌ Profile update failed:', result.error_message)
-        return { success: false, error: result.error_message }
-      }
-
-      console.log('✅ Profile updated successfully via database function')
-      
       return {
         success: true,
-        data: result.user_data as User
+        data: data as User
       }
     } catch (error) {
       console.error('💥 Error in updateProfile:', error)
-      return { 
-        success: false, 
-        error: error instanceof Error ? error.message : 'Unknown error occurred' 
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : 'Unknown error occurred'
       }
     }
   },
@@ -158,141 +156,132 @@ export const profileService = {
     pickup_locations: any[]
   }>> {
     try {
-      console.log('🔍 Getting complete profile via database function:', userId)
+      console.log('🔍 Getting complete profile:', userId)
 
-      const { data, error } = await supabase.rpc('get_complete_user_profile', {
+      // Use the new clean API function
+      const { data, error } = await supabase.rpc('api_get_user_profile', {
         p_user_id: userId
       })
 
       if (error) {
-        console.error('❌ Database function error:', error)
+        console.error('❌ Backend API error:', error)
         return { success: false, error: error.message }
       }
 
       if (!data || data.length === 0) {
-        return { success: false, error: 'No data returned from database function' }
+        return { success: false, error: 'User not found' }
       }
 
       const result = data[0]
-      
+
       if (!result.success) {
         console.error('❌ Profile retrieval failed:', result.error_message)
         return { success: false, error: result.error_message }
       }
 
-      console.log('✅ Profile retrieved successfully via database function')
-      
+      console.log('✅ Profile retrieved successfully via backend API')
+
       return {
         success: true,
-        data: {
-          profile: result.profile_data as User,
-          pickup_locations: result.pickup_locations || []
-        }
+        data: result.data
       }
+
+
     } catch (error) {
       console.error('💥 Error in getCompleteProfile:', error)
-      return { 
-        success: false, 
-        error: error instanceof Error ? error.message : 'Unknown error occurred' 
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : 'Unknown error occurred'
       }
     }
   },
 
   /**
-   * Add pickup location using database function
+   * Add pickup location using direct database access
+   * TODO: Implement api_add_pickup_location function call
    */
   async addPickupLocation(userId: string, locationData: PickupLocationData): Promise<ProfileServiceResponse<any>> {
     try {
-      console.log('🔍 Adding pickup location via database function:', { userId, locationData })
+      console.log('🔍 Adding pickup location via direct database:', { userId, locationData })
 
-      const { data, error } = await supabase.rpc('add_pickup_location', {
-        p_user_id: userId,
-        p_name: locationData.name,
-        p_description: locationData.description,
-        p_location_lng: locationData.coords[1], // Convert [lat, lng] to lng
-        p_location_lat: locationData.coords[0],  // Convert [lat, lng] to lat
-        p_is_default: locationData.is_default || false
-      })
+      const { data, error } = await supabase
+        .from('pickup_locations')
+        .insert({
+          user_id: userId,
+          name: locationData.name,
+          description: locationData.description,
+          coords: `POINT(${locationData.coords[1]} ${locationData.coords[0]})`, // Convert [lat, lng] to POINT(lng lat)
+          is_default: locationData.is_default || false
+        })
+        .select()
+        .single()
 
       if (error) {
-        console.error('❌ Database function error:', error)
+        console.error('❌ Pickup location creation failed:', error)
         return { success: false, error: error.message }
       }
 
-      if (!data || data.length === 0) {
-        return { success: false, error: 'No data returned from database function' }
-      }
+      console.log('✅ Pickup location created successfully')
 
-      const result = data[0]
-      
-      if (!result.success) {
-        console.error('❌ Pickup location creation failed:', result.error_message)
-        return { success: false, error: result.error_message }
-      }
-
-      console.log('✅ Pickup location created successfully via database function')
-      
       return {
         success: true,
-        data: result.pickup_location_data
+        data: data
       }
     } catch (error) {
       console.error('💥 Error in addPickupLocation:', error)
-      return { 
-        success: false, 
-        error: error instanceof Error ? error.message : 'Unknown error occurred' 
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : 'Unknown error occurred'
       }
     }
   },
 
   /**
-   * Update pickup location using database function
+   * Update pickup location using direct database access
+   * TODO: Implement api_update_pickup_location function call
    */
   async updatePickupLocation(
-    locationId: string, 
-    userId: string, 
+    locationId: string,
+    userId: string,
     updates: Partial<PickupLocationData>
   ): Promise<ProfileServiceResponse<any>> {
     try {
-      console.log('🔍 Updating pickup location via database function:', { locationId, userId, updates })
+      console.log('🔍 Updating pickup location via direct database:', { locationId, userId, updates })
 
-      const { data, error } = await supabase.rpc('update_pickup_location', {
-        p_location_id: locationId,
-        p_user_id: userId,
-        p_name: updates.name || null,
-        p_description: updates.description || null,
-        p_location_lng: updates.coords?.[1] || null, // Convert [lat, lng] to lng
-        p_location_lat: updates.coords?.[0] || null,  // Convert [lat, lng] to lat
-        p_is_default: updates.is_default !== undefined ? updates.is_default : null
-      })
+      const updateData: any = {}
+
+      if (updates.name !== undefined) updateData.name = updates.name
+      if (updates.description !== undefined) updateData.description = updates.description
+      if (updates.is_default !== undefined) updateData.is_default = updates.is_default
+
+      if (updates.coords) {
+        updateData.coords = `POINT(${updates.coords[1]} ${updates.coords[0]})` // Convert [lat, lng] to POINT(lng lat)
+      }
+
+      const { data, error } = await supabase
+        .from('pickup_locations')
+        .update(updateData)
+        .eq('id', locationId)
+        .eq('user_id', userId)
+        .select()
+        .single()
 
       if (error) {
-        console.error('❌ Database function error:', error)
+        console.error('❌ Pickup location update failed:', error)
         return { success: false, error: error.message }
       }
 
-      if (!data || data.length === 0) {
-        return { success: false, error: 'No data returned from database function' }
-      }
+      console.log('✅ Pickup location updated successfully')
 
-      const result = data[0]
-      
-      if (!result.success) {
-        console.error('❌ Pickup location update failed:', result.error_message)
-        return { success: false, error: result.error_message }
-      }
-
-      console.log('✅ Pickup location updated successfully via database function')
-      
       return {
         success: true,
-        data: result.pickup_location_data
+        data: data
       }
     } catch (error) {
       console.error('💥 Error in updatePickupLocation:', error)
-      return { 
-        success: false, 
-        error: error instanceof Error ? error.message : 'Unknown error occurred' 
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : 'Unknown error occurred'
       }
     }
   },
@@ -309,8 +298,8 @@ export const profileService = {
     try {
       console.log('🔍 Getting profile status via database function:', userId)
 
-      const { data, error } = await supabase.rpc('get_profile_status', {
-        user_id: userId
+      const { data, error } = await supabase.rpc('api_get_profile_status', {
+        p_user_id: userId
       })
 
       if (error) {
@@ -319,14 +308,21 @@ export const profileService = {
       }
 
       if (!data || data.length === 0) {
-        return { success: false, error: 'No data returned from database function' }
+        return { success: false, error: 'No data returned from backend' }
       }
 
-      console.log('✅ Profile status retrieved successfully via database function')
-      
+      const result = data[0]
+
+      if (!result.success) {
+        console.error('❌ Profile status check failed:', result.error_message)
+        return { success: false, error: result.error_message }
+      }
+
+      console.log('✅ Profile status retrieved successfully via backend API')
+
       return {
         success: true,
-        data: data[0]
+        data: result.data
       }
     } catch (error) {
       console.error('💥 Error in getProfileStatus:', error)
