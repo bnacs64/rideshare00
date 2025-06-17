@@ -14,7 +14,10 @@
     "lint": "eslint .",
     "preview": "vite preview",
     "install:clean": "pnpm install --frozen-lockfile",
-    "type-check": "tsc --noEmit"
+    "type-check": "tsc --noEmit",
+    "test:users": "node scripts/testUserCreation.js",
+    "test:users:cleanup": "node scripts/testUserCreation.js cleanup",
+    "fix:email-validation": "node scripts/fixEmailValidation.js"
   },
   "dependencies": {
     "@google/generative-ai": "^0.24.1",

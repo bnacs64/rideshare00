@@ -20,6 +20,7 @@ import { MatchingTestPage } from './pages/MatchingTestPage'
 import { MatchedRidesPage } from './pages/MatchedRidesPage'
 import { MatchingAdminPage } from './pages/MatchingAdminPage'
 import { RidesPage } from './pages/RidesPage'
+import { TestingPage } from './pages/TestingPage'
 import { LoadingSpinner } from './components/LoadingSpinner'
 import './App.css'
 
@@ -161,6 +162,10 @@ function AppRoutes() {
         <Route
           path="/debug"
           element={<DebugPage />}
+        />
+        <Route
+          path="/testing"
+          element={<TestingPage />}
         />
         <Route
           path="/opt-in-status"

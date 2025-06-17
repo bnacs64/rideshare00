@@ -22,7 +22,7 @@ export interface TestResult {
 // Predefined test users for consistent testing
 export const TEST_USERS: TestUser[] = [
   {
-    email: 'test1@akshathe.xyz',
+    email: 'test1@northsouth.edu',
     password: 'TestPassword123!',
     fullName: 'Test User One',
     defaultRole: 'RIDER',
@@ -30,7 +30,7 @@ export const TEST_USERS: TestUser[] = [
     homeLocationAddress: 'Dhaka, Bangladesh'
   },
   {
-    email: 'test2@akshathe.xyz',
+    email: 'test2@northsouth.edu',
     password: 'TestPassword123!',
     fullName: 'Test User Two',
     defaultRole: 'DRIVER',
@@ -47,7 +47,7 @@ export const TEST_USERS: TestUser[] = [
     }
   },
   {
-    email: 'test3@akshathe.xyz',
+    email: 'test3@northsouth.edu',
     password: 'TestPassword123!',
     fullName: 'Test User Three',
     defaultRole: 'RIDER',

@@ -120,7 +120,14 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     setFetchingProfile(true)
     try {
       console.log('Fetching user profile for:', supabaseUser.email)
-      const { user, error } = await userService.getUserProfile(supabaseUser.id)
+
+      // Add timeout to profile fetch
+      const profilePromise = userService.getUserProfile(supabaseUser.id)
+      const timeoutPromise = new Promise((_, reject) =>
+        setTimeout(() => reject(new Error('Profile fetch timeout')), 8000)
+      )
+
+      const { user, error } = await Promise.race([profilePromise, timeoutPromise]) as any
 
       if (error) {
         console.error('Error fetching user profile:', error)
@@ -156,8 +163,25 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       }
     } catch (error) {
       console.error('Exception in fetchUserProfile:', error)
-      // On any exception, set user to null
-      setUser(null)
+
+      // If it's a timeout error, create minimal user state
+      if (error instanceof Error && error.message.includes('timeout')) {
+        console.log('Profile fetch timeout, creating minimal user state')
+        setUser({
+          id: supabaseUser.id,
+          email: supabaseUser.email || '',
+          full_name: '',
+          default_role: 'RIDER',
+          home_location_coords: [90.4125, 23.8103],
+          driver_details: null,
+          telegram_user_id: null,
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString()
+        })
+      } else {
+        // On other exceptions, set user to null
+        setUser(null)
+      }
     } finally {
       setFetchingProfile(false)
     }

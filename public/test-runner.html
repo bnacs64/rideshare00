@@ -1,0 +1,434 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>NSU Commute - User Testing</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            background: white;
+            padding: 30px;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        h1 {
+            color: #333;
+            text-align: center;
+            margin-bottom: 30px;
+        }
+        .button {
+            background: #007bff;
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 6px;
+            cursor: pointer;
+            margin: 8px;
+            font-size: 14px;
+        }
+        .button:hover {
+            background: #0056b3;
+        }
+        .button:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+        }
+        .button.danger {
+            background: #dc3545;
+        }
+        .button.danger:hover {
+            background: #c82333;
+        }
+        .log-container {
+            background: #f8f9fa;
+            border: 1px solid #dee2e6;
+            border-radius: 4px;
+            padding: 15px;
+            margin-top: 20px;
+            max-height: 400px;
+            overflow-y: auto;
+            font-family: 'Courier New', monospace;
+            font-size: 12px;
+        }
+        .log-entry {
+            margin-bottom: 5px;
+            padding: 2px 0;
+        }
+        .log-success {
+            color: #28a745;
+        }
+        .log-error {
+            color: #dc3545;
+        }
+        .log-info {
+            color: #007bff;
+        }
+        .controls {
+            text-align: center;
+            margin-bottom: 20px;
+        }
+        .status {
+            text-align: center;
+            margin: 20px 0;
+            font-weight: bold;
+        }
+        .config {
+            background: #e9ecef;
+            padding: 15px;
+            border-radius: 4px;
+            margin-bottom: 20px;
+        }
+        .config h3 {
+            margin-top: 0;
+        }
+        .config-item {
+            margin: 8px 0;
+            font-family: monospace;
+            font-size: 12px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🧪 NSU Commute User Testing</h1>
+        
+        <div class="config">
+            <h3>Configuration</h3>
+            <div class="config-item">Supabase URL: <span id="supabase-url">Not configured</span></div>
+            <div class="config-item">Test Domain: @akshathe.xyz</div>
+            <div class="config-item">Email Validation: Bypassed</div>
+        </div>
+
+        <div class="controls">
+            <button class="button" onclick="testConnection()">Test Connection</button>
+            <button class="button" onclick="createSingleUser()">Create Single User</button>
+            <button class="button" onclick="createMultipleUsers()">Create Multiple Users</button>
+            <button class="button" onclick="stressTest()">Stress Test</button>
+            <button class="button danger" onclick="cleanupUsers()">Cleanup Test Users</button>
+            <button class="button" onclick="clearLogs()">Clear Logs</button>
+        </div>
+
+        <div class="status" id="status">Ready to test</div>
+
+        <div class="log-container" id="logs">
+            <div class="log-entry log-info">Welcome to NSU Commute User Testing Suite</div>
+            <div class="log-entry log-info">Click "Test Connection" to verify Supabase connectivity</div>
+        </div>
+    </div>
+
+    <script type="module">
+        // Configuration
+        const SUPABASE_URL = 'https://fwshmucplaqqtpkzqbvb.supabase.co'
+        const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZ3c2htdWNwbGFxcXRwa3pxYnZiIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTAxMDQ3OTcsImV4cCI6MjA2NTY4MDc5N30.qHYbtXCrx3LSC-dmyLniTuiBgAiwC2t3Z_ldRDxV87U'
+        
+        // Update UI with config
+        document.getElementById('supabase-url').textContent = SUPABASE_URL
+
+        // Import Supabase
+        import { createClient } from 'https://cdn.skypack.dev/@supabase/supabase-js'
+        
+        const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY)
+
+        // Test users
+        const TEST_USERS = [
+            {
+                email: 'htmltest1@northsouth.edu',
+                password: 'TestPassword123!',
+                fullName: 'HTML Test User 1',
+                defaultRole: 'RIDER'
+            },
+            {
+                email: 'htmltest2@northsouth.edu',
+                password: 'TestPassword123!',
+                fullName: 'HTML Test User 2',
+                defaultRole: 'DRIVER'
+            }
+        ]
+
+        // Logging functions
+        function log(message, type = 'info') {
+            const timestamp = new Date().toLocaleTimeString()
+            const logEntry = document.createElement('div')
+            logEntry.className = `log-entry log-${type}`
+            logEntry.textContent = `[${timestamp}] ${message}`
+            
+            const logsContainer = document.getElementById('logs')
+            logsContainer.appendChild(logEntry)
+            logsContainer.scrollTop = logsContainer.scrollHeight
+        }
+
+        function setStatus(message, type = 'info') {
+            const statusEl = document.getElementById('status')
+            statusEl.textContent = message
+            statusEl.style.color = type === 'error' ? '#dc3545' : type === 'success' ? '#28a745' : '#007bff'
+        }
+
+        function disableButtons(disabled = true) {
+            const buttons = document.querySelectorAll('.button')
+            buttons.forEach(btn => btn.disabled = disabled)
+        }
+
+        // Test functions
+        window.testConnection = async function() {
+            disableButtons(true)
+            setStatus('Testing connection...')
+            log('Testing Supabase connection...', 'info')
+
+            try {
+                const { data, error } = await supabase.from('users').select('count').limit(1)
+                
+                if (error) {
+                    log(`Connection test failed: ${error.message}`, 'error')
+                    setStatus('Connection failed', 'error')
+                } else {
+                    log('✅ Supabase connection successful', 'success')
+                    setStatus('Connection successful', 'success')
+                }
+            } catch (error) {
+                log(`Connection error: ${error.message}`, 'error')
+                setStatus('Connection error', 'error')
+            } finally {
+                disableButtons(false)
+            }
+        }
+
+        window.createSingleUser = async function() {
+            disableButtons(true)
+            setStatus('Creating single user...')
+            
+            const testUser = TEST_USERS[0]
+            log(`Creating user: ${testUser.email}`, 'info')
+
+            try {
+                // Step 1: Sign up
+                const { data: authData, error: authError } = await supabase.auth.signUp({
+                    email: testUser.email,
+                    password: testUser.password
+                })
+
+                if (authError) {
+                    log(`❌ Signup failed: ${authError.message}`, 'error')
+                    setStatus('Signup failed', 'error')
+                    return
+                }
+
+                log(`✅ Auth user created: ${authData.user?.email}`, 'success')
+
+                // Step 2: Create profile (simplified for HTML test)
+                if (authData.user) {
+                    const profileData = {
+                        id: authData.user.id,
+                        email: authData.user.email,
+                        full_name: testUser.fullName,
+                        default_role: testUser.defaultRole,
+                        home_location_coords: 'POINT(90.4125 23.8103)',
+                        home_location_address: 'Dhaka, Bangladesh'
+                    }
+
+                    const { error: profileError } = await supabase
+                        .from('users')
+                        .insert(profileData)
+
+                    if (profileError) {
+                        log(`❌ Profile creation failed: ${profileError.message}`, 'error')
+                        setStatus('Profile creation failed', 'error')
+                    } else {
+                        log(`✅ Profile created successfully`, 'success')
+                        setStatus('User created successfully', 'success')
+                    }
+                }
+
+            } catch (error) {
+                log(`💥 User creation failed: ${error.message}`, 'error')
+                setStatus('User creation failed', 'error')
+            } finally {
+                disableButtons(false)
+            }
+        }
+
+        window.createMultipleUsers = async function() {
+            disableButtons(true)
+            setStatus('Creating multiple users...')
+            log('Creating multiple test users...', 'info')
+
+            let successCount = 0
+            let failureCount = 0
+
+            for (const testUser of TEST_USERS) {
+                try {
+                    log(`Creating user: ${testUser.email}`, 'info')
+
+                    const { data: authData, error: authError } = await supabase.auth.signUp({
+                        email: testUser.email,
+                        password: testUser.password
+                    })
+
+                    if (authError) {
+                        log(`❌ Signup failed for ${testUser.email}: ${authError.message}`, 'error')
+                        failureCount++
+                        continue
+                    }
+
+                    if (authData.user) {
+                        const profileData = {
+                            id: authData.user.id,
+                            email: authData.user.email,
+                            full_name: testUser.fullName,
+                            default_role: testUser.defaultRole,
+                            home_location_coords: 'POINT(90.4125 23.8103)',
+                            home_location_address: 'Dhaka, Bangladesh'
+                        }
+
+                        const { error: profileError } = await supabase
+                            .from('users')
+                            .insert(profileData)
+
+                        if (profileError) {
+                            log(`❌ Profile creation failed for ${testUser.email}: ${profileError.message}`, 'error')
+                            failureCount++
+                        } else {
+                            log(`✅ User created successfully: ${testUser.email}`, 'success')
+                            successCount++
+                        }
+                    }
+
+                    // Small delay between users
+                    await new Promise(resolve => setTimeout(resolve, 500))
+
+                } catch (error) {
+                    log(`💥 Error creating ${testUser.email}: ${error.message}`, 'error')
+                    failureCount++
+                }
+            }
+
+            log(`📊 Results: ${successCount} successful, ${failureCount} failed`, 'info')
+            setStatus(`Created ${successCount}/${TEST_USERS.length} users`, successCount > 0 ? 'success' : 'error')
+            disableButtons(false)
+        }
+
+        window.stressTest = async function() {
+            disableButtons(true)
+            setStatus('Running stress test...')
+            log('Starting stress test with rapid user creation...', 'info')
+
+            const stressUsers = Array.from({ length: 3 }, (_, i) => ({
+                email: `stresstest${i + 1}@northsouth.edu`,
+                password: 'TestPassword123!',
+                fullName: `Stress Test User ${i + 1}`,
+                defaultRole: i % 2 === 0 ? 'RIDER' : 'DRIVER'
+            }))
+
+            let successCount = 0
+            let failureCount = 0
+
+            const promises = stressUsers.map(async (testUser) => {
+                try {
+                    const { data: authData, error: authError } = await supabase.auth.signUp({
+                        email: testUser.email,
+                        password: testUser.password
+                    })
+
+                    if (authError) {
+                        log(`❌ Stress test signup failed for ${testUser.email}`, 'error')
+                        failureCount++
+                        return
+                    }
+
+                    if (authData.user) {
+                        const profileData = {
+                            id: authData.user.id,
+                            email: authData.user.email,
+                            full_name: testUser.fullName,
+                            default_role: testUser.defaultRole,
+                            home_location_coords: 'POINT(90.4125 23.8103)',
+                            home_location_address: 'Dhaka, Bangladesh'
+                        }
+
+                        const { error: profileError } = await supabase
+                            .from('users')
+                            .insert(profileData)
+
+                        if (profileError) {
+                            log(`❌ Stress test profile failed for ${testUser.email}`, 'error')
+                            failureCount++
+                        } else {
+                            log(`✅ Stress test user created: ${testUser.email}`, 'success')
+                            successCount++
+                        }
+                    }
+                } catch (error) {
+                    log(`💥 Stress test error for ${testUser.email}: ${error.message}`, 'error')
+                    failureCount++
+                }
+            })
+
+            await Promise.all(promises)
+
+            log(`📊 Stress test results: ${successCount} successful, ${failureCount} failed`, 'info')
+            setStatus(`Stress test: ${successCount}/${stressUsers.length} users created`, successCount > 0 ? 'success' : 'error')
+            disableButtons(false)
+        }
+
+        window.cleanupUsers = async function() {
+            disableButtons(true)
+            setStatus('Cleaning up test users...')
+            log('Cleaning up test users...', 'info')
+
+            const testEmails = [
+                ...TEST_USERS.map(u => u.email),
+                'stresstest1@northsouth.edu',
+                'stresstest2@northsouth.edu',
+                'stresstest3@northsouth.edu'
+            ]
+
+            let cleanedCount = 0
+
+            for (const email of testEmails) {
+                try {
+                    // Try to sign in to get user ID
+                    const { data: signInData } = await supabase.auth.signInWithPassword({
+                        email,
+                        password: 'TestPassword123!'
+                    })
+
+                    if (signInData.user) {
+                        // Delete from users table
+                        await supabase
+                            .from('users')
+                            .delete()
+                            .eq('id', signInData.user.id)
+
+                        log(`🗑️ Cleaned up user: ${email}`, 'info')
+                        cleanedCount++
+                    }
+
+                    // Sign out
+                    await supabase.auth.signOut()
+
+                } catch (error) {
+                    log(`⚠️ Could not cleanup ${email}: ${error.message}`, 'error')
+                }
+            }
+
+            log(`✅ Cleanup completed: ${cleanedCount} users removed`, 'success')
+            setStatus(`Cleaned up ${cleanedCount} users`, 'success')
+            disableButtons(false)
+        }
+
+        window.clearLogs = function() {
+            document.getElementById('logs').innerHTML = ''
+            setStatus('Logs cleared')
+        }
+
+        // Initialize
+        log('Test runner initialized. Ready to test!', 'success')
+    </script>
+</body>
+</html>

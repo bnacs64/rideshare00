@@ -145,7 +145,7 @@ export const stressTestSignupFlow = async (
   
   for (let i = 0; i < userCount; i++) {
     const testUser: TestUser = {
-      email: `stresstest${i + 1}@akshathe.xyz`,
+      email: `stresstest${i + 1}@northsouth.edu`,
       password: 'TestPassword123!',
       fullName: `Stress Test User ${i + 1}`,
       defaultRole: i % 2 === 0 ? 'RIDER' : 'DRIVER',
@@ -243,7 +243,7 @@ export const runAllSignupTests = async (): Promise<string> => {
   console.log(report)
   
   // Cleanup stress test users
-  const stressTestEmails = stressResults.map((_, i) => `stresstest${i + 1}@akshathe.xyz`)
+  const stressTestEmails = stressResults.map((_, i) => `stresstest${i + 1}@northsouth.edu`)
   await cleanupTestUsers(stressTestEmails)
   
   return report
