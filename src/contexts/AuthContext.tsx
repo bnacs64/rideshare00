@@ -29,11 +29,19 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
     // Get initial session
     const getInitialSession = async () => {
-      const { data: { session } } = await supabase.auth.getSession()
-      if (session?.user) {
-        await fetchUserProfile(session.user)
+      try {
+        const { data: { session } } = await supabase.auth.getSession()
+        if (session?.user) {
+          await fetchUserProfile(session.user)
+        } else {
+          setUser(null)
+        }
+      } catch (error) {
+        console.error('Error getting initial session:', error)
+        setUser(null)
+      } finally {
+        setLoading(false)
       }
-      setLoading(false)
     }
 
     getInitialSession()
@@ -43,12 +51,18 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       async (event, session) => {
         console.log('Auth state change:', event, session?.user?.email)
 
-        if (session?.user) {
-          await fetchUserProfile(session.user)
-        } else {
+        try {
+          if (session?.user) {
+            await fetchUserProfile(session.user)
+          } else {
+            setUser(null)
+          }
+        } catch (error) {
+          console.error('Error in auth state change handler:', error)
           setUser(null)
+        } finally {
+          setLoading(false)
         }
-        setLoading(false)
       }
     )
 
@@ -64,6 +78,21 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         // If user profile doesn't exist, this might be a new user
         if ((error as any)?.code === 'PGRST116') {
           console.log('User profile not found - new user needs to complete profile setup')
+          // Create a minimal user object for authenticated users without profiles
+          setUser({
+            id: supabaseUser.id,
+            email: supabaseUser.email || '',
+            full_name: '',
+            default_role: 'RIDER',
+            home_location_coords: [90.4125, 23.8103], // Default Dhaka coordinates
+            driver_details: null,
+            telegram_user_id: null,
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString()
+          })
+        } else {
+          // For other errors, set user to null
+          setUser(null)
         }
         return
       }
@@ -73,6 +102,8 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       }
     } catch (error) {
       console.error('Error in fetchUserProfile:', error)
+      // On any exception, set user to null
+      setUser(null)
     }
   }
 
@@ -130,6 +161,17 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     }
   }
 
+  const refreshUser = async () => {
+    try {
+      const { data: { user: authUser } } = await supabase.auth.getUser()
+      if (authUser) {
+        await fetchUserProfile(authUser)
+      }
+    } catch (error) {
+      console.error('Error refreshing user:', error)
+    }
+  }
+
   const updateProfile = async (updates: Partial<User>) => {
     try {
       if (!user) {
@@ -161,6 +203,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     signUp,
     signOut,
     updateProfile,
+    refreshUser,
   }
 
   return (

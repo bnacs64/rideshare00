@@ -9,6 +9,9 @@ import { DashboardPage } from './pages/DashboardPage'
 import { ProfilePage } from './pages/ProfilePage'
 import { LocationDashboard } from './pages/LocationDashboard'
 import { OptInPage } from './pages/OptInPage'
+import { ScheduledOptInsPage } from './pages/ScheduledOptInsPage'
+import { OptInStatusPage } from './pages/OptInStatusPage'
+import { MatchingTestPage } from './pages/MatchingTestPage'
 import { RidesPage } from './pages/RidesPage'
 import { LoadingSpinner } from './components/LoadingSpinner'
 import './App.css'
@@ -23,6 +26,11 @@ const ProtectedRoute: React.FC<{ children: React.ReactNode }> = ({ children }) =
 
   if (!user) {
     return <Navigate to="/login" replace />
+  }
+
+  // If user is authenticated but doesn't have a complete profile, redirect to profile setup
+  if (!user.full_name || user.full_name.trim() === '') {
+    return <Navigate to="/profile-setup" replace />
   }
 
   return <>{children}</>
@@ -100,6 +108,30 @@ function AppRoutes() {
           element={
             <ProtectedRoute>
               <OptInPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/scheduled-opt-ins"
+          element={
+            <ProtectedRoute>
+              <ScheduledOptInsPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/opt-in-status"
+          element={
+            <ProtectedRoute>
+              <OptInStatusPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/matching-test"
+          element={
+            <ProtectedRoute>
+              <MatchingTestPage />
             </ProtectedRoute>
           }
         />

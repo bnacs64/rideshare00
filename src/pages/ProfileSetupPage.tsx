@@ -31,12 +31,12 @@ export const ProfileSetupPage: React.FC = () => {
   const [locationLoading, setLocationLoading] = useState(false)
   const [showLocationPicker, setShowLocationPicker] = useState(false)
   
-  const { user } = useAuth()
+  const { user, refreshUser } = useAuth()
   const navigate = useNavigate()
 
   useEffect(() => {
-    // If user already has a profile, redirect to dashboard
-    if (user) {
+    // If user already has a complete profile (has full_name), redirect to dashboard
+    if (user && user.full_name && user.full_name.trim() !== '') {
       navigate('/dashboard')
     }
   }, [user, navigate])
@@ -184,7 +184,8 @@ export const ProfileSetupPage: React.FC = () => {
         return
       }
 
-      // Profile created successfully, redirect to dashboard
+      // Profile created successfully, refresh user data and redirect to dashboard
+      await refreshUser()
       navigate('/dashboard')
     } catch (error) {
       console.error('Profile setup error:', error)

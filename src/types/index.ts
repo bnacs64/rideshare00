@@ -150,6 +150,7 @@ export interface AuthContextType {
   signUp: (email: string, password: string) => Promise<{ error: any }>
   signOut: () => Promise<void>
   updateProfile: (updates: Partial<User>) => Promise<{ error: any }>
+  refreshUser: () => Promise<void>
 }
 
 export interface LocationContextType {
