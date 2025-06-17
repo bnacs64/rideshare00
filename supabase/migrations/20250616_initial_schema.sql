@@ -21,6 +21,7 @@ CREATE TABLE users (
     full_name TEXT NOT NULL,
     default_role user_role NOT NULL DEFAULT 'RIDER',
     home_location_coords GEOMETRY(POINT, 4326) NOT NULL,
+    home_location_address TEXT,
     driver_details JSONB,
     telegram_user_id BIGINT,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),

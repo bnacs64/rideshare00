@@ -153,32 +153,61 @@ export const ProfileSetupPage: React.FC = () => {
     setLoading(true)
     setError('')
 
+    console.log('🚀 Starting profile setup submission...')
+    console.log('Form data:', formData)
+
     try {
       if (!validateStep2()) {
+        console.log('❌ Step 2 validation failed')
         setLoading(false)
         return
       }
 
-      // Get current user from Supabase auth
-      const { data: { user: authUser } } = await supabase.auth.getUser()
-      
-      if (!authUser) {
+      console.log('✅ Step 2 validation passed')
+
+      // Use the user from AuthContext instead of making another Supabase call
+      console.log('🔍 Getting current user from AuthContext...')
+
+      if (!user || !user.id) {
+        console.log('❌ No authenticated user found in context')
         setError('Authentication error. Please try logging in again.')
         setLoading(false)
         return
       }
 
+      console.log('✅ Authenticated user found in context:', user.email)
+
+      // Create a proper auth user object for profile creation
+      const authUser = {
+        id: user.id,
+        email: user.email
+      }
+
       // Create user profile
-      const { user: newUser, error } = await userService.createUserProfile({
+      console.log('📝 Creating user profile...')
+      const profileData = {
         id: authUser.id,
         email: authUser.email!,
         full_name: formData.fullName,
         default_role: formData.defaultRole,
         home_location_coords: formData.homeLocationCoords!,
+        home_location_address: formData.homeLocationAddress,
         driver_details: formData.driverDetails
-      })
+      }
+      console.log('Profile data to be created:', profileData)
+
+      // Add timeout to prevent hanging
+      const profileCreationPromise = userService.createUserProfile(profileData)
+      const timeoutPromise = new Promise((_, reject) =>
+        setTimeout(() => reject(new Error('Profile creation timeout')), 15000)
+      )
+
+      const { user: newUser, error } = await Promise.race([profileCreationPromise, timeoutPromise]) as any
+
+      console.log('📋 Profile creation result:', { user: newUser, error })
 
       if (error) {
+        console.log('❌ Profile creation error:', error)
         // If the error is about duplicate key (user already exists), redirect to dashboard
         if (error.message && error.message.includes('duplicate key')) {
           console.log('User profile already exists, redirecting to dashboard')
@@ -191,13 +220,29 @@ export const ProfileSetupPage: React.FC = () => {
         return
       }
 
+      console.log('✅ Profile created successfully, refreshing user data...')
       // Profile created successfully, refresh user data and redirect to dashboard
       await refreshUser()
+      console.log('✅ User data refreshed, navigating to dashboard...')
       navigate('/dashboard')
     } catch (error) {
-      console.error('Profile setup error:', error)
-      setError('An unexpected error occurred')
+      console.error('💥 Profile setup error:', error)
+
+      // If it's a timeout error, try to navigate anyway
+      if (error instanceof Error && error.message.includes('timeout')) {
+        console.log('⏰ Timeout occurred, attempting to navigate to dashboard anyway...')
+        try {
+          await refreshUser()
+          navigate('/dashboard')
+          return
+        } catch (navError) {
+          console.error('Navigation after timeout failed:', navError)
+        }
+      }
+
+      setError('An unexpected error occurred: ' + (error instanceof Error ? error.message : 'Unknown error'))
     } finally {
+      console.log('🏁 Profile setup submission completed, setting loading to false')
       setLoading(false)
     }
   }

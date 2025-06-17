@@ -15,6 +15,7 @@ export interface UpdateUserProfileData {
   full_name?: string
   default_role?: 'DRIVER' | 'RIDER'
   home_location_coords?: [number, number]
+  home_location_address?: string
   driver_details?: DriverDetails | null
   telegram_user_id?: number | null
 }
@@ -22,48 +23,59 @@ export interface UpdateUserProfileData {
 export const userService = {
   // Create user profile after successful registration
   async createUserProfile(data: CreateUserProfileData) {
+    console.log('🔍 createUserProfile called with data:', data)
     try {
-      // First check if user already exists
-      const { data: existingUser } = await supabase
-        .from('users')
-        .select('*')
-        .eq('id', data.id)
-        .single()
-
-      if (existingUser) {
-        console.log('User profile already exists, updating instead of creating')
-        // User exists, update their profile instead
-        return this.updateUserProfile(data.id, {
-          full_name: data.full_name,
-          default_role: data.default_role,
-          home_location_coords: `POINT(${data.home_location_coords[0]} ${data.home_location_coords[1]})`,
-          driver_details: data.driver_details,
-          telegram_user_id: data.telegram_user_id
-        })
-      }
+      // Try to create the user directly - if it fails due to duplicate, we'll handle it
+      console.log('🔍 Attempting to create user profile directly...')
 
       // User doesn't exist, create new profile
+      console.log('📝 Creating new user profile...')
+      const insertData = {
+        id: data.id,
+        email: data.email,
+        full_name: data.full_name,
+        default_role: data.default_role,
+        home_location_coords: `POINT(${data.home_location_coords[0]} ${data.home_location_coords[1]})`,
+        home_location_address: data.home_location_address,
+        driver_details: data.driver_details,
+        telegram_user_id: data.telegram_user_id
+      }
+      console.log('📋 Insert data:', insertData)
+
       const { data: user, error } = await supabase
         .from('users')
-        .insert({
-          id: data.id,
-          email: data.email,
-          full_name: data.full_name,
-          default_role: data.default_role,
-          home_location_coords: data.home_location_coords,
-          home_location_address: data.home_location_address,
-          driver_details: data.driver_details,
-          telegram_user_id: data.telegram_user_id
-        })
+        .insert(insertData)
         .select()
         .single()
 
+      console.log('📋 Insert result:', { user, error })
+
       if (error) {
         console.error('Error creating user profile:', error)
+
+        // If it's a duplicate key error, try to update the existing user instead
+        if (error.code === '23505' && error.message.includes('duplicate key')) {
+          console.log('🔄 User already exists, attempting to update instead...')
+          return this.updateUserProfile(data.id, {
+            full_name: data.full_name,
+            default_role: data.default_role,
+            home_location_coords: data.home_location_coords,
+            home_location_address: data.home_location_address,
+            driver_details: data.driver_details,
+            telegram_user_id: data.telegram_user_id
+          })
+        }
+
         return { user: null, error }
       }
 
-      return { user, error: null }
+      // Convert PostGIS point back to coordinates array
+      const userWithCoords = {
+        ...user,
+        home_location_coords: this.parseLocationCoords(user.home_location_coords)
+      }
+
+      return { user: userWithCoords, error: null }
     } catch (error) {
       console.error('Error in createUserProfile:', error)
       return { user: null, error }
@@ -99,20 +111,33 @@ export const userService = {
 
   // Update user profile
   async updateUserProfile(userId: string, updates: UpdateUserProfileData) {
+    console.log('🔄 updateUserProfile called for user:', userId)
+    console.log('🔄 Updates to apply:', updates)
     try {
       const updateData: any = { ...updates }
-      
+
       // Convert coordinates to PostGIS format if provided
       if (updates.home_location_coords) {
-        updateData.home_location_coords = `POINT(${updates.home_location_coords[0]} ${updates.home_location_coords[1]})`
+        console.log('Converting coordinates to PostGIS:', updates.home_location_coords)
+        const [lng, lat] = updates.home_location_coords
+        if (typeof lng === 'number' && typeof lat === 'number' && !isNaN(lng) && !isNaN(lat)) {
+          updateData.home_location_coords = `POINT(${lng} ${lat})`
+          console.log('PostGIS format:', updateData.home_location_coords)
+        } else {
+          console.error('Invalid coordinates:', updates.home_location_coords)
+          throw new Error('Invalid coordinates provided')
+        }
       }
 
+      console.log('🔄 Executing update with data:', updateData)
       const { data, error } = await supabase
         .from('users')
         .update(updateData)
         .eq('id', userId)
         .select()
         .single()
+
+      console.log('📋 Update result:', { data, error })
 
       if (error) {
         console.error('Error updating user profile:', error)
