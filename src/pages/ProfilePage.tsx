@@ -22,6 +22,7 @@ export const ProfilePage: React.FC = () => {
 
   const [formData, setFormData] = useState({
     full_name: user?.full_name || '',
+    telegram_user_id: user?.telegram_user_id || '',
     default_role: user?.default_role || 'RIDER',
     driver_details: user?.driver_details || null
   })
@@ -74,6 +75,7 @@ export const ProfilePage: React.FC = () => {
   const handleCancelEdit = () => {
     setFormData({
       full_name: user.full_name,
+      telegram_user_id: user.telegram_user_id || '',
       default_role: user.default_role,
       driver_details: user.driver_details
     })
@@ -165,6 +167,28 @@ export const ProfilePage: React.FC = () => {
                     />
                   ) : (
                     <p className="text-sm text-foreground">{user.full_name}</p>
+                  )}
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="telegram_user_id">Telegram User ID</Label>
+                  {editing ? (
+                    <div className="space-y-1">
+                      <Input
+                        id="telegram_user_id"
+                        name="telegram_user_id"
+                        value={formData.telegram_user_id}
+                        onChange={handleInputChange}
+                        placeholder="e.g., 123456789"
+                      />
+                      <p className="text-xs text-muted-foreground">
+                        Get your Telegram ID by messaging @userinfobot on Telegram
+                      </p>
+                    </div>
+                  ) : (
+                    <p className="text-sm text-foreground">
+                      {user.telegram_user_id || 'Not set - required for ride notifications'}
+                    </p>
                   )}
                 </div>
 

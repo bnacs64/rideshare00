@@ -30,6 +30,7 @@
     "@supabase/auth-ui-shared": "^0.1.8",
     "@supabase/supabase-js": "^2.50.0",
     "@types/leaflet": "^1.9.18",
+    "@types/node": "^24.0.3",
     "@types/react-router-dom": "^5.3.3",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
@@ -42,6 +43,7 @@
     "react-leaflet": "^5.0.0",
     "react-router-dom": "^7.6.2",
     "tailwind-merge": "^3.3.1",
+    "telegraf": "^4.16.3",
     "vite-plugin-pwa": "^1.0.0",
     "workbox-window": "^7.3.0",
     "zod": "^3.25.65"

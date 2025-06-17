@@ -451,6 +451,86 @@ export const optInService = {
     }
   },
 
+  // Scheduled Opt-in Automation
+
+  /**
+   * Trigger scheduled opt-ins creation for a specific date using Edge Function
+   */
+  async triggerScheduledOptIns(date?: string, dryRun: boolean = false) {
+    try {
+      const { data: { session } } = await supabase.auth.getSession()
+
+      if (!session) {
+        return { success: false, error: 'User not authenticated' }
+      }
+
+      const { data, error } = await supabase.functions.invoke('scheduled-opt-ins', {
+        body: {
+          date,
+          dryRun
+        }
+      })
+
+      if (error) {
+        console.error('Error calling scheduled-opt-ins function:', error)
+        return { success: false, error: error.message }
+      }
+
+      return {
+        success: data.success,
+        ...data
+      }
+    } catch (error) {
+      console.error('Error in triggerScheduledOptIns:', error)
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : 'Unknown error occurred'
+      }
+    }
+  },
+
+  /**
+   * Get summary of scheduled opt-ins by day of week
+   */
+  async getScheduledOptInsSummary() {
+    try {
+      const { data, error } = await supabase
+        .from('scheduled_opt_ins_summary')
+        .select('*')
+
+      if (error) {
+        console.error('Error fetching scheduled opt-ins summary:', error)
+        return { summary: [], error }
+      }
+
+      return { summary: data || [], error: null }
+    } catch (error) {
+      console.error('Error in getScheduledOptInsSummary:', error)
+      return { summary: [], error }
+    }
+  },
+
+  /**
+   * Get recent automatic opt-ins created from scheduled opt-ins
+   */
+  async getRecentAutomaticOptIns() {
+    try {
+      const { data, error } = await supabase
+        .from('recent_automatic_opt_ins')
+        .select('*')
+
+      if (error) {
+        console.error('Error fetching recent automatic opt-ins:', error)
+        return { optIns: [], error }
+      }
+
+      return { optIns: data || [], error: null }
+    } catch (error) {
+      console.error('Error in getRecentAutomaticOptIns:', error)
+      return { optIns: [], error }
+    }
+  },
+
   // Utility functions
 
   /**

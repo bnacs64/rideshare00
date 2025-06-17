@@ -10,6 +10,11 @@ import { ProfilePage } from './pages/ProfilePage'
 import { LocationDashboard } from './pages/LocationDashboard'
 import { OptInPage } from './pages/OptInPage'
 import { ScheduledOptInsPage } from './pages/ScheduledOptInsPage'
+import { ScheduledOptInAutomationPage } from './pages/ScheduledOptInAutomationPage'
+import { RouteOptimizationTestPage } from './pages/RouteOptimizationTestPage'
+import { TelegramBotTestPage } from './pages/TelegramBotTestPage'
+import { SystemAutomationPage } from './pages/SystemAutomationPage'
+import { DebugPage } from './pages/DebugPage'
 import { OptInStatusPage } from './pages/OptInStatusPage'
 import { MatchingTestPage } from './pages/MatchingTestPage'
 import { MatchedRidesPage } from './pages/MatchedRidesPage'
@@ -120,6 +125,42 @@ function AppRoutes() {
               <ScheduledOptInsPage />
             </ProtectedRoute>
           }
+        />
+        <Route
+          path="/scheduled-automation"
+          element={
+            <ProtectedRoute>
+              <ScheduledOptInAutomationPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/route-optimization-test"
+          element={
+            <ProtectedRoute>
+              <RouteOptimizationTestPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/telegram-bot-test"
+          element={
+            <ProtectedRoute>
+              <TelegramBotTestPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/system-automation"
+          element={
+            <ProtectedRoute>
+              <SystemAutomationPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/debug"
+          element={<DebugPage />}
         />
         <Route
           path="/opt-in-status"

@@ -3,7 +3,7 @@ import type { User as SupabaseUser } from '@supabase/supabase-js'
 import { supabase } from '../services/supabase'
 import { userService } from '../services/userService'
 import type { User, AuthContextType } from '../types'
-import { testSupabaseConnection } from '../utils/testConnection'
+import { runDiagnostics } from '../utils/testConnection'
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined)
 
@@ -24,22 +24,34 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
-    // Test Supabase connection on app start
-    testSupabaseConnection()
+    // Run comprehensive diagnostics on app start
+    runDiagnostics()
 
-    // Get initial session
+    // Get initial session with timeout
     const getInitialSession = async () => {
       try {
-        const { data: { session } } = await supabase.auth.getSession()
+        console.log('Getting initial session...')
+
+        // Add timeout to prevent infinite loading
+        const sessionPromise = supabase.auth.getSession()
+        const timeoutPromise = new Promise((_, reject) =>
+          setTimeout(() => reject(new Error('Session fetch timeout')), 10000)
+        )
+
+        const { data: { session } } = await Promise.race([sessionPromise, timeoutPromise]) as any
+
         if (session?.user) {
+          console.log('Session found, fetching user profile...')
           await fetchUserProfile(session.user)
         } else {
+          console.log('No session found, setting user to null')
           setUser(null)
         }
       } catch (error) {
         console.error('Error getting initial session:', error)
         setUser(null)
       } finally {
+        console.log('Setting loading to false')
         setLoading(false)
       }
     }
@@ -53,14 +65,37 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
         try {
           if (session?.user) {
-            await fetchUserProfile(session.user)
+            console.log('Auth state change: user found, fetching profile...')
+            // Add timeout for profile fetching
+            const profilePromise = fetchUserProfile(session.user)
+            const timeoutPromise = new Promise((resolve) =>
+              setTimeout(() => {
+                console.log('Profile fetch timeout, setting user to minimal state')
+                setUser({
+                  id: session.user.id,
+                  email: session.user.email || '',
+                  full_name: '',
+                  default_role: 'RIDER',
+                  home_location_coords: [90.4125, 23.8103],
+                  driver_details: null,
+                  telegram_user_id: null,
+                  created_at: new Date().toISOString(),
+                  updated_at: new Date().toISOString()
+                })
+                resolve(null)
+              }, 8000)
+            )
+
+            await Promise.race([profilePromise, timeoutPromise])
           } else {
+            console.log('Auth state change: no user, setting to null')
             setUser(null)
           }
         } catch (error) {
           console.error('Error in auth state change handler:', error)
           setUser(null)
         } finally {
+          console.log('Auth state change: setting loading to false')
           setLoading(false)
         }
       }
@@ -71,6 +106,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
   const fetchUserProfile = async (supabaseUser: SupabaseUser) => {
     try {
+      console.log('Fetching user profile for:', supabaseUser.email)
       const { user, error } = await userService.getUserProfile(supabaseUser.id)
 
       if (error) {
@@ -92,16 +128,21 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
           })
         } else {
           // For other errors, set user to null
+          console.error('Database error, setting user to null:', error)
           setUser(null)
         }
         return
       }
 
       if (user) {
+        console.log('User profile loaded successfully:', user.email)
         setUser(user)
+      } else {
+        console.log('No user data returned, setting user to null')
+        setUser(null)
       }
     } catch (error) {
-      console.error('Error in fetchUserProfile:', error)
+      console.error('Exception in fetchUserProfile:', error)
       // On any exception, set user to null
       setUser(null)
     }

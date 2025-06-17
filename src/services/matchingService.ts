@@ -1,6 +1,10 @@
 import { supabase } from './supabase'
 import { geminiService, type MatchingRequest, type MatchingResult } from './geminiService'
 import { optInService } from './optInService'
+import { uberService } from './uberService'
+import { googleMapsService } from './googleMapsService'
+import { notificationService } from './notificationService'
+import type { UberRouteData } from '../types'
 
 export interface MatchedRide {
   id: string
@@ -151,17 +155,24 @@ export const matchingService = {
         return { ride: null, error: 'No driver found in match' }
       }
 
-      // Create the matched ride
+      // Use enhanced route optimization with APIs
+      const { routeData, error: routeError } = await this.optimizeRouteWithAPIs(match)
+
+      if (routeError) {
+        console.warn('Route optimization warning:', routeError)
+      }
+
+      // Create the matched ride with optimized route data
       const { data: ride, error: rideError } = await supabase
         .from('matched_rides')
         .insert({
           commute_date: commuteDate,
           status: 'PENDING_CONFIRMATION',
           driver_user_id: driverParticipant.user_id,
-          estimated_cost_per_person: match.route_optimization.estimated_cost_per_person,
-          estimated_total_time: match.route_optimization.estimated_total_time,
-          pickup_order: match.route_optimization.pickup_order,
-          route_optimization_data: match.route_optimization,
+          estimated_cost_per_person: Math.round(routeData.estimated_cost / match.participants.length),
+          estimated_total_time: Math.round(routeData.duration / 60), // Convert seconds to minutes
+          pickup_order: routeData.waypoints.map(wp => wp.user_id).filter(Boolean),
+          route_optimization_data: routeData,
           ai_confidence_score: match.confidence,
           ai_reasoning: match.reasoning
         })
@@ -204,6 +215,23 @@ export const matchingService = {
       if (updateError) {
         console.error('Error updating opt-in statuses:', updateError)
         // Note: We don't rollback here as the ride is created, just log the error
+      }
+
+      // Send ride match notifications
+      try {
+        const notificationResult = await notificationService.sendNotificationsForRide(
+          ride.id,
+          'MATCH'
+        )
+
+        if (!notificationResult.success) {
+          console.warn('Some notifications failed to send:', notificationResult.errors)
+        } else {
+          console.log(`Sent ${notificationResult.sent_count} ride match notifications`)
+        }
+      } catch (notificationError) {
+        console.error('Error sending ride match notifications:', notificationError)
+        // Don't fail the ride creation if notifications fail
       }
 
       return { ride }
@@ -347,11 +375,41 @@ export const matchingService = {
       if (newStatus) {
         await supabase
           .from('matched_rides')
-          .update({ 
+          .update({
             status: newStatus,
             updated_at: new Date().toISOString()
           })
           .eq('id', rideId)
+
+        // Send appropriate notifications based on status
+        try {
+          if (newStatus === 'CONFIRMED') {
+            const notificationResult = await notificationService.sendNotificationsForRide(
+              rideId,
+              'CONFIRMATION'
+            )
+
+            if (!notificationResult.success) {
+              console.warn('Some confirmation notifications failed to send:', notificationResult.errors)
+            } else {
+              console.log(`Sent ${notificationResult.sent_count} ride confirmation notifications`)
+            }
+          } else if (newStatus === 'CANCELLED') {
+            const notificationResult = await notificationService.sendNotificationsForRide(
+              rideId,
+              'CANCELLATION',
+              'One or more participants declined the ride'
+            )
+
+            if (!notificationResult.success) {
+              console.warn('Some cancellation notifications failed to send:', notificationResult.errors)
+            } else {
+              console.log(`Sent ${notificationResult.sent_count} ride cancellation notifications`)
+            }
+          }
+        } catch (notificationError) {
+          console.error('Error sending status change notifications:', notificationError)
+        }
       }
     } catch (error) {
       console.error('Error in checkRideConfirmationStatus:', error)
@@ -513,6 +571,150 @@ export const matchingService = {
       return {
         success: false,
         error: error instanceof Error ? error.message : 'Unknown error occurred'
+      }
+    }
+  },
+
+  /**
+   * Enhanced route optimization using Uber API or Google Maps API
+   */
+  async optimizeRouteWithAPIs(match: MatchingResult['matches'][0]): Promise<{ routeData: UberRouteData; error?: string }> {
+    try {
+      // Extract pickup locations from match participants
+      const pickupPoints = match.participants.map(participant => ({
+        latitude: participant.pickup_location.coords[1], // lat
+        longitude: participant.pickup_location.coords[0], // lng
+        address: participant.pickup_location.name,
+        user_id: participant.user_id
+      }))
+
+      // NSU coordinates as destination
+      const nsuLocation = { latitude: 23.8103, longitude: 90.4125 }
+
+      // Start from the driver's pickup location
+      const driverParticipant = match.participants.find(p => p.role === 'DRIVER')
+      if (!driverParticipant) {
+        throw new Error('No driver found in match')
+      }
+
+      const startPoint = {
+        latitude: driverParticipant.pickup_location.coords[1],
+        longitude: driverParticipant.pickup_location.coords[0]
+      }
+
+      // Remove driver from pickup points (they're the starting point)
+      const riderPickupPoints = pickupPoints.filter(p => p.user_id !== driverParticipant.user_id)
+
+      let routeResult = null
+      let error = null
+
+      // Try Uber API first
+      if (uberService.isConfigured()) {
+        try {
+          const uberResult = await uberService.optimizeRoute(
+            startPoint,
+            nsuLocation,
+            riderPickupPoints
+          )
+
+          if (uberResult.result && !uberResult.error) {
+            routeResult = uberResult.result
+          } else {
+            error = uberResult.error
+          }
+        } catch (uberError) {
+          console.warn('Uber API failed, trying Google Maps:', uberError)
+          error = uberError instanceof Error ? uberError.message : 'Uber API failed'
+        }
+      }
+
+      // Fallback to Google Maps API
+      if (!routeResult && googleMapsService.isConfigured()) {
+        try {
+          const googleResult = await googleMapsService.optimizePickupRoute(
+            { lat: startPoint.latitude, lng: startPoint.longitude },
+            { lat: nsuLocation.latitude, lng: nsuLocation.longitude },
+            riderPickupPoints.map(p => ({
+              lat: p.latitude,
+              lng: p.longitude,
+              address: p.address,
+              user_id: p.user_id
+            }))
+          )
+
+          if (googleResult.route && !googleResult.error) {
+            // Convert Google Maps result to our UberRouteData format
+            routeResult = {
+              optimized_waypoints: googleResult.route.waypoints.map(wp => ({
+                latitude: wp.location.lat,
+                longitude: wp.location.lng,
+                address: wp.address,
+                user_id: wp.user_id,
+                pickup_order: wp.order
+              })),
+              total_distance: googleResult.route.total_distance,
+              total_duration: googleResult.route.total_duration,
+              estimated_cost: googleResult.route.estimated_cost,
+              cost_per_person: googleResult.route.cost_per_person,
+              pickup_etas: googleResult.route.pickup_etas
+            }
+          } else {
+            error = googleResult.error
+          }
+        } catch (googleError) {
+          console.warn('Google Maps API failed:', googleError)
+          error = googleError instanceof Error ? googleError.message : 'Google Maps API failed'
+        }
+      }
+
+      // If both APIs failed, use the basic algorithm from geminiService
+      if (!routeResult) {
+        console.log('Both APIs failed, using basic algorithm')
+        const basicResult = geminiService.calculateRouteData(match.participants, [90.4125, 23.8103])
+
+        routeResult = {
+          optimized_waypoints: [],
+          total_distance: 0,
+          total_duration: basicResult.estimated_total_time * 60, // convert minutes to seconds
+          estimated_cost: basicResult.estimated_cost_per_person * match.participants.length,
+          cost_per_person: basicResult.estimated_cost_per_person,
+          pickup_etas: {}
+        }
+      }
+
+      // Convert to UberRouteData format
+      const uberRouteData: UberRouteData = {
+        distance: routeResult.total_distance,
+        duration: routeResult.total_duration,
+        waypoints: routeResult.optimized_waypoints?.map(wp => ({
+          latitude: wp.latitude,
+          longitude: wp.longitude,
+          address: wp.address,
+          user_id: wp.user_id
+        })) || [],
+        estimated_cost: routeResult.estimated_cost,
+        pickup_etas: routeResult.pickup_etas || {}
+      }
+
+      return { routeData: uberRouteData, error }
+
+    } catch (error) {
+      console.error('Error optimizing route with APIs:', error)
+
+      // Fallback to basic calculation
+      const basicResult = geminiService.calculateRouteData(match.participants, [90.4125, 23.8103])
+
+      const fallbackRouteData: UberRouteData = {
+        distance: 10000, // 10km default
+        duration: basicResult.estimated_total_time * 60,
+        waypoints: [],
+        estimated_cost: basicResult.estimated_cost_per_person * match.participants.length,
+        pickup_etas: {}
+      }
+
+      return {
+        routeData: fallbackRouteData,
+        error: error instanceof Error ? error.message : 'Route optimization failed'
       }
     }
   }

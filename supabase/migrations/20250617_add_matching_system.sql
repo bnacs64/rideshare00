@@ -27,17 +27,39 @@ BEGIN
 END $$;
 
 -- Update matched_rides table to match the code expectations
-ALTER TABLE matched_rides 
-  RENAME COLUMN driver_id TO driver_user_id;
+-- Check if driver_id column exists and rename it, otherwise skip
+DO $$
+BEGIN
+  IF EXISTS (SELECT 1 FROM information_schema.columns
+             WHERE table_name = 'matched_rides' AND column_name = 'driver_id') THEN
+    ALTER TABLE matched_rides RENAME COLUMN driver_id TO driver_user_id;
+    RAISE NOTICE 'Renamed driver_id to driver_user_id';
+  ELSE
+    RAISE NOTICE 'Column driver_id does not exist, skipping rename';
+  END IF;
+END $$;
 
-ALTER TABLE matched_rides 
-  RENAME COLUMN ride_date TO commute_date;
+-- Safe column renames for matched_rides
+DO $$
+BEGIN
+  IF EXISTS (SELECT 1 FROM information_schema.columns
+             WHERE table_name = 'matched_rides' AND column_name = 'ride_date') THEN
+    ALTER TABLE matched_rides RENAME COLUMN ride_date TO commute_date;
+    RAISE NOTICE 'Renamed ride_date to commute_date';
+  END IF;
 
-ALTER TABLE matched_rides 
-  RENAME COLUMN uber_api_route_data TO route_optimization_data;
+  IF EXISTS (SELECT 1 FROM information_schema.columns
+             WHERE table_name = 'matched_rides' AND column_name = 'uber_api_route_data') THEN
+    ALTER TABLE matched_rides RENAME COLUMN uber_api_route_data TO route_optimization_data;
+    RAISE NOTICE 'Renamed uber_api_route_data to route_optimization_data';
+  END IF;
 
-ALTER TABLE matched_rides 
-  RENAME COLUMN cost_per_rider TO estimated_cost_per_person;
+  IF EXISTS (SELECT 1 FROM information_schema.columns
+             WHERE table_name = 'matched_rides' AND column_name = 'cost_per_rider') THEN
+    ALTER TABLE matched_rides RENAME COLUMN cost_per_rider TO estimated_cost_per_person;
+    RAISE NOTICE 'Renamed cost_per_rider to estimated_cost_per_person';
+  END IF;
+END $$;
 
 -- Add missing columns to matched_rides
 ALTER TABLE matched_rides 
@@ -47,8 +69,14 @@ ALTER TABLE matched_rides
   ADD COLUMN IF NOT EXISTS ai_reasoning TEXT;
 
 -- Update ride_participants table to match code expectations
-ALTER TABLE ride_participants 
-  RENAME COLUMN ride_id TO matched_ride_id;
+DO $$
+BEGIN
+  IF EXISTS (SELECT 1 FROM information_schema.columns
+             WHERE table_name = 'ride_participants' AND column_name = 'ride_id') THEN
+    ALTER TABLE ride_participants RENAME COLUMN ride_id TO matched_ride_id;
+    RAISE NOTICE 'Renamed ride_id to matched_ride_id in ride_participants';
+  END IF;
+END $$;
 
 -- Add missing columns to ride_participants
 ALTER TABLE ride_participants 
@@ -60,8 +88,19 @@ ALTER TABLE ride_participants
 ALTER TABLE ride_participants 
   DROP CONSTRAINT IF EXISTS ride_participants_ride_id_user_id_key;
 
-ALTER TABLE ride_participants 
-  ADD CONSTRAINT ride_participants_matched_ride_id_user_id_key UNIQUE(matched_ride_id, user_id);
+-- Add unique constraint safely
+DO $$
+BEGIN
+  IF NOT EXISTS (SELECT 1 FROM information_schema.table_constraints
+                 WHERE table_name = 'ride_participants'
+                 AND constraint_name = 'ride_participants_matched_ride_id_user_id_key') THEN
+    ALTER TABLE ride_participants
+      ADD CONSTRAINT ride_participants_matched_ride_id_user_id_key UNIQUE(matched_ride_id, user_id);
+    RAISE NOTICE 'Added unique constraint ride_participants_matched_ride_id_user_id_key';
+  ELSE
+    RAISE NOTICE 'Constraint ride_participants_matched_ride_id_user_id_key already exists';
+  END IF;
+END $$;
 
 -- Create matching_schedules table
 DO $$
@@ -107,64 +146,138 @@ CREATE INDEX IF NOT EXISTS idx_matching_jobs_schedule_id ON matching_jobs(schedu
 CREATE INDEX IF NOT EXISTS idx_matching_jobs_status ON matching_jobs(status);
 CREATE INDEX IF NOT EXISTS idx_matching_jobs_created_at ON matching_jobs(created_at);
 
--- Add updated_at triggers for new tables
-CREATE TRIGGER update_matching_schedules_updated_at 
-    BEFORE UPDATE ON matching_schedules 
-    FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+-- Add updated_at triggers for new tables (safe creation)
+DO $$
+BEGIN
+  IF NOT EXISTS (SELECT 1 FROM information_schema.triggers
+                 WHERE trigger_name = 'update_matching_schedules_updated_at') THEN
+    CREATE TRIGGER update_matching_schedules_updated_at
+        BEFORE UPDATE ON matching_schedules
+        FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+  END IF;
 
-CREATE TRIGGER update_matching_jobs_updated_at 
-    BEFORE UPDATE ON matching_jobs 
-    FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+  IF NOT EXISTS (SELECT 1 FROM information_schema.triggers
+                 WHERE trigger_name = 'update_matching_jobs_updated_at') THEN
+    CREATE TRIGGER update_matching_jobs_updated_at
+        BEFORE UPDATE ON matching_jobs
+        FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+  END IF;
+END $$;
 
 -- Enable RLS on new tables
 ALTER TABLE matching_schedules ENABLE ROW LEVEL SECURITY;
 ALTER TABLE matching_jobs ENABLE ROW LEVEL SECURITY;
 
--- RLS policies for matching_schedules (admin only for now)
-CREATE POLICY "Admin can manage matching schedules" ON matching_schedules FOR ALL 
-    USING (auth.jwt() ->> 'role' = 'admin');
+-- RLS policies for matching_schedules (safe creation)
+DO $$
+BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE tablename = 'matching_schedules' AND policyname = 'Admin can manage matching schedules') THEN
+    CREATE POLICY "Admin can manage matching schedules" ON matching_schedules FOR ALL
+        USING (auth.jwt() ->> 'role' = 'admin');
+  END IF;
 
-CREATE POLICY "Users can view active schedules" ON matching_schedules FOR SELECT 
-    USING (is_active = true);
+  IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE tablename = 'matching_schedules' AND policyname = 'Users can view active schedules') THEN
+    CREATE POLICY "Users can view active schedules" ON matching_schedules FOR SELECT
+        USING (is_active = true);
+  END IF;
+END $$;
 
--- RLS policies for matching_jobs (admin only for now)
-CREATE POLICY "Admin can manage matching jobs" ON matching_jobs FOR ALL 
-    USING (auth.jwt() ->> 'role' = 'admin');
+-- RLS policies for matching_jobs (safe creation)
+DO $$
+BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE tablename = 'matching_jobs' AND policyname = 'Admin can manage matching jobs') THEN
+    CREATE POLICY "Admin can manage matching jobs" ON matching_jobs FOR ALL
+        USING (auth.jwt() ->> 'role' = 'admin');
+  END IF;
 
-CREATE POLICY "Users can view job history" ON matching_jobs FOR SELECT 
-    USING (true); -- Allow all authenticated users to view job history
+  IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE tablename = 'matching_jobs' AND policyname = 'Users can view job history') THEN
+    CREATE POLICY "Users can view job history" ON matching_jobs FOR SELECT
+        USING (true);
+  END IF;
 
--- Update the ride_participants foreign key references
-ALTER TABLE ride_participants 
-    DROP CONSTRAINT IF EXISTS ride_participants_ride_id_fkey;
+  -- Allow authenticated users to create manual matching jobs
+  IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE tablename = 'matching_jobs' AND policyname = 'Users can create manual matching jobs') THEN
+    CREATE POLICY "Users can create manual matching jobs" ON matching_jobs FOR INSERT
+        WITH CHECK (auth.uid() IS NOT NULL AND schedule_id IS NULL);
+  END IF;
+END $$; -- Allow all authenticated users to view job history
 
-ALTER TABLE ride_participants 
-    ADD CONSTRAINT ride_participants_matched_ride_id_fkey 
-    FOREIGN KEY (matched_ride_id) REFERENCES matched_rides(id) ON DELETE CASCADE;
+-- Update the ride_participants foreign key references (safe creation)
+DO $$
+BEGIN
+  -- Drop old constraint if it exists
+  IF EXISTS (SELECT 1 FROM information_schema.table_constraints
+             WHERE table_name = 'ride_participants'
+             AND constraint_name = 'ride_participants_ride_id_fkey') THEN
+    ALTER TABLE ride_participants DROP CONSTRAINT ride_participants_ride_id_fkey;
+  END IF;
 
--- Fix the indexes that reference old column names
-DROP INDEX IF EXISTS idx_matched_rides_driver_date;
-DROP INDEX IF EXISTS idx_ride_participants_ride_id;
+  -- Add new constraint if it doesn't exist
+  IF NOT EXISTS (SELECT 1 FROM information_schema.table_constraints
+                 WHERE table_name = 'ride_participants'
+                 AND constraint_name = 'ride_participants_matched_ride_id_fkey') THEN
+    ALTER TABLE ride_participants
+        ADD CONSTRAINT ride_participants_matched_ride_id_fkey
+        FOREIGN KEY (matched_ride_id) REFERENCES matched_rides(id) ON DELETE CASCADE;
+  END IF;
+END $$;
 
-CREATE INDEX IF NOT EXISTS idx_matched_rides_driver_date ON matched_rides(driver_user_id, commute_date);
-CREATE INDEX IF NOT EXISTS idx_ride_participants_matched_ride_id ON ride_participants(matched_ride_id);
-CREATE INDEX IF NOT EXISTS idx_ride_participants_daily_opt_in_id ON ride_participants(daily_opt_in_id);
+-- Fix the indexes that reference old column names (safe creation)
+DO $$
+BEGIN
+  -- Drop old indexes if they exist
+  DROP INDEX IF EXISTS idx_matched_rides_driver_date;
+  DROP INDEX IF EXISTS idx_ride_participants_ride_id;
 
--- Update RLS policies to use correct column names
-DROP POLICY IF EXISTS "Users can view rides they're involved in" ON matched_rides;
-DROP POLICY IF EXISTS "Drivers can update their rides" ON matched_rides;
+  -- Create new indexes if they don't exist
+  IF NOT EXISTS (SELECT 1 FROM pg_indexes WHERE indexname = 'idx_matched_rides_driver_date') THEN
+    CREATE INDEX idx_matched_rides_driver_date ON matched_rides(driver_user_id, commute_date);
+  END IF;
 
-CREATE POLICY "Users can view rides they're involved in" ON matched_rides FOR SELECT USING (
-    auth.uid() = driver_user_id OR 
-    auth.uid() IN (SELECT user_id FROM ride_participants WHERE matched_ride_id = matched_rides.id)
-);
+  IF NOT EXISTS (SELECT 1 FROM pg_indexes WHERE indexname = 'idx_ride_participants_matched_ride_id') THEN
+    CREATE INDEX idx_ride_participants_matched_ride_id ON ride_participants(matched_ride_id);
+  END IF;
 
-CREATE POLICY "Drivers can update their rides" ON matched_rides FOR UPDATE USING (auth.uid() = driver_user_id);
+  IF NOT EXISTS (SELECT 1 FROM pg_indexes WHERE indexname = 'idx_ride_participants_daily_opt_in_id') THEN
+    CREATE INDEX idx_ride_participants_daily_opt_in_id ON ride_participants(daily_opt_in_id);
+  END IF;
+END $$;
 
-CREATE POLICY "System can create matched rides" ON matched_rides FOR INSERT WITH CHECK (true);
+-- Update RLS policies to use correct column names (safe drops)
+DO $$
+BEGIN
+  -- Drop old policies if they exist
+  IF EXISTS (SELECT 1 FROM pg_policies WHERE tablename = 'matched_rides' AND policyname = 'Users can view rides they''re involved in') THEN
+    DROP POLICY "Users can view rides they're involved in" ON matched_rides;
+  END IF;
 
--- Allow system to create ride participants
-CREATE POLICY "System can create ride participants" ON ride_participants FOR INSERT WITH CHECK (true);
+  IF EXISTS (SELECT 1 FROM pg_policies WHERE tablename = 'matched_rides' AND policyname = 'Drivers can update their rides') THEN
+    DROP POLICY "Drivers can update their rides" ON matched_rides;
+  END IF;
+END $$;
+
+-- Create new policies safely
+DO $$
+BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE tablename = 'matched_rides' AND policyname = 'Users can view rides they''re involved in') THEN
+    CREATE POLICY "Users can view rides they're involved in" ON matched_rides FOR SELECT USING (
+        auth.uid() = driver_user_id OR
+        auth.uid() IN (SELECT user_id FROM ride_participants WHERE matched_ride_id = matched_rides.id)
+    );
+  END IF;
+
+  IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE tablename = 'matched_rides' AND policyname = 'Drivers can update their rides') THEN
+    CREATE POLICY "Drivers can update their rides" ON matched_rides FOR UPDATE USING (auth.uid() = driver_user_id);
+  END IF;
+
+  IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE tablename = 'matched_rides' AND policyname = 'System can create matched rides') THEN
+    CREATE POLICY "System can create matched rides" ON matched_rides FOR INSERT WITH CHECK (true);
+  END IF;
+
+  IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE tablename = 'ride_participants' AND policyname = 'System can create ride participants') THEN
+    CREATE POLICY "System can create ride participants" ON ride_participants FOR INSERT WITH CHECK (true);
+  END IF;
+END $$;
 
 -- Grant permissions for new tables
 GRANT ALL ON matching_schedules TO authenticated;
