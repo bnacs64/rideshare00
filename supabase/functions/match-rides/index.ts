@@ -231,19 +231,68 @@ function parseMatchingResponse(response: string, targetOptIn: any, availableOptI
     }
 
     const parsed = JSON.parse(jsonMatch[0])
-    
+
     if (!parsed.matches || !Array.isArray(parsed.matches)) {
       console.warn('Invalid matches format in Gemini response')
       return []
     }
 
-    return parsed.matches.filter((match: any) => {
-      // Basic validation
-      return match.confidence && 
-             match.reasoning && 
-             match.participants && 
-             Array.isArray(match.participants) &&
-             match.participants.length > 0
+    // Map AI response to actual data
+    const allOptIns = [targetOptIn, ...availableOptIns]
+
+    return parsed.matches.map((match: any) => {
+      // Map participants to actual opt-in data
+      const mappedParticipants = []
+
+      // Always include the target opt-in
+      mappedParticipants.push({
+        opt_in_id: targetOptIn.id,
+        user_id: targetOptIn.user_id,
+        role: targetOptIn.users.default_role,
+        pickup_location_id: targetOptIn.pickup_location_id
+      })
+
+      // Add other participants based on AI's selection
+      if (match.participants && match.participants.length > 1) {
+        // For now, add the first available opt-in that matches the role requirements
+        const needsDriver = !mappedParticipants.some(p => p.role === 'DRIVER')
+        const needsRider = mappedParticipants.every(p => p.role === 'DRIVER')
+
+        for (const availableOptIn of availableOptIns) {
+          if (needsDriver && availableOptIn.users.default_role === 'DRIVER') {
+            mappedParticipants.push({
+              opt_in_id: availableOptIn.id,
+              user_id: availableOptIn.user_id,
+              role: availableOptIn.users.default_role,
+              pickup_location_id: availableOptIn.pickup_location_id
+            })
+            break
+          } else if (needsRider && availableOptIn.users.default_role === 'RIDER') {
+            mappedParticipants.push({
+              opt_in_id: availableOptIn.id,
+              user_id: availableOptIn.user_id,
+              role: availableOptIn.users.default_role,
+              pickup_location_id: availableOptIn.pickup_location_id
+            })
+            break
+          }
+        }
+      }
+
+      return {
+        confidence: match.confidence || 70,
+        reasoning: match.reasoning || 'AI-generated match',
+        participants: mappedParticipants,
+        route_optimization: {
+          pickup_order: mappedParticipants.map(p => p.pickup_location_id),
+          estimated_total_time: match.route_optimization?.estimated_total_time || 30,
+          estimated_cost_per_person: match.route_optimization?.estimated_cost_per_person || 100
+        }
+      }
+    }).filter((match: any) => {
+      // Ensure we have at least one driver and valid participants
+      const hasDriver = match.participants.some((p: any) => p.role === 'DRIVER')
+      return hasDriver && match.participants.length > 0
     })
   } catch (error) {
     console.error('Error parsing Gemini response:', error)
@@ -259,18 +308,23 @@ async function createMatchedRide(supabaseClient: any, match: any, commuteDate: s
       throw new Error('No driver found in match')
     }
 
-    // Create the matched ride
+    // Create the matched ride using NEW schema field names
     const { data: ride, error: rideError } = await supabaseClient
       .from('matched_rides')
       .insert({
         commute_date: commuteDate,
-        status: 'PENDING_CONFIRMATION',
+        status: 'PROPOSED',
         driver_user_id: driverParticipant.user_id,
         estimated_cost_per_person: match.route_optimization.estimated_cost_per_person,
         estimated_total_time: match.route_optimization.estimated_total_time,
         pickup_order: match.route_optimization.pickup_order,
-        route_optimization_data: match.route_optimization,
-        ai_confidence_score: match.confidence,
+        route_optimization_data: {
+          ...match.route_optimization,
+          ai_confidence_score: match.confidence,
+          ai_reasoning: match.reasoning,
+          created_by: 'ai_matching'
+        },
+        ai_confidence_score: match.confidence / 100, // Convert to decimal
         ai_reasoning: match.reasoning
       })
       .select()
@@ -280,13 +334,13 @@ async function createMatchedRide(supabaseClient: any, match: any, commuteDate: s
       throw new Error(`Failed to create matched ride: ${rideError.message}`)
     }
 
-    // Create ride participants
+    // Create ride participants using NEW schema field names
     const participantInserts = match.participants.map((participant: any) => ({
       matched_ride_id: ride.id,
       user_id: participant.user_id,
       daily_opt_in_id: participant.opt_in_id,
       pickup_location_id: participant.pickup_location_id,
-      status: 'PENDING',
+      status: 'PENDING_ACCEPTANCE',
       confirmation_deadline: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString()
     }))
 
