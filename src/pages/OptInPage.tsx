@@ -11,6 +11,7 @@ import { Label } from '../components/ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../components/ui/select'
 import { Alert, AlertDescription } from '../components/ui/alert'
 import { LoadingSpinner } from '../components/LoadingSpinner'
+import { LocationSetupGuide } from '../components/location/LocationSetupGuide'
 import {
   Calendar,
   Clock,
@@ -35,6 +36,9 @@ export const OptInPage: React.FC = () => {
   const { user } = useAuth()
   const { pickupLocations, loading: locationsLoading } = usePickupLocations()
   const { createDailyOptIn, submitting, checkExistingOptIn, todayOptIns } = useOptIns()
+
+  // Check if user has home location
+  const hasHomeLocation = user?.home_location_coords && user.home_location_coords.length === 2
 
   const [formData, setFormData] = useState<OptInFormData>({
     commute_date: '',
@@ -315,15 +319,11 @@ export const OptInPage: React.FC = () => {
                         <p className="text-sm text-red-600">{errors.pickup_location_id}</p>
                       )}
                       {pickupLocations.length === 0 && (
-                        <div className="text-sm text-gray-600 bg-gray-50 p-3 rounded-md">
-                          <p className="mb-2">You don't have any pickup locations set up yet.</p>
-                          <Button variant="outline" size="sm" asChild>
-                            <Link to="/profile">
-                              <Plus className="w-3 h-3 mr-1" />
-                              Add Pickup Location
-                            </Link>
-                          </Button>
-                        </div>
+                        <LocationSetupGuide
+                          hasHomeLocation={hasHomeLocation}
+                          hasPickupLocations={pickupLocations.length > 0}
+                          onAddPickupLocation={() => window.open('/profile', '_blank')}
+                        />
                       )}
                     </div>
 

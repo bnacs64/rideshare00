@@ -1,11 +1,10 @@
 import React, { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
-import { userService } from '../services/userService'
+import { profileService } from '../services/profileService'
 import { LocationPicker } from '../components/map/LocationPicker'
 import { Button } from '../components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card'
-import { supabase } from '../services/supabase'
 import type { DriverDetails } from '../types'
 import { LoadingSpinner } from '../components/LoadingSpinner'
 
@@ -183,45 +182,33 @@ export const ProfileSetupPage: React.FC = () => {
         email: user.email
       }
 
-      // Create user profile
-      console.log('📝 Creating user profile...')
+      // Create complete profile using database function
+      console.log('📝 Creating complete profile via database function...')
       const profileData = {
         id: authUser.id,
         email: authUser.email!,
         full_name: formData.fullName,
         default_role: formData.defaultRole,
-        home_location_coords: formData.homeLocationCoords!,
+        home_location_coords: formData.homeLocationCoords!, // [lng, lat] for PostGIS
         home_location_address: formData.homeLocationAddress,
         driver_details: formData.driverDetails
       }
       console.log('Profile data to be created:', profileData)
 
-      // Add timeout to prevent hanging
-      const profileCreationPromise = userService.createUserProfile(profileData)
-      const timeoutPromise = new Promise((_, reject) =>
-        setTimeout(() => reject(new Error('Profile creation timeout')), 15000)
-      )
+      const result = await profileService.createCompleteProfile(profileData)
 
-      const { user: newUser, error } = await Promise.race([profileCreationPromise, timeoutPromise]) as any
-
-      console.log('📋 Profile creation result:', { user: newUser, error })
-
-      if (error) {
-        console.log('❌ Profile creation error:', error)
-        // If the error is about duplicate key (user already exists), redirect to dashboard
-        if (error.message && error.message.includes('duplicate key')) {
-          console.log('User profile already exists, redirecting to dashboard')
-          await refreshUser()
-          navigate('/dashboard')
-          return
-        }
-        setError(error.message || 'Failed to create profile')
+      if (!result.success) {
+        console.log('❌ Profile creation failed:', result.error)
+        setError(result.error || 'Failed to create profile')
         setLoading(false)
         return
       }
 
-      console.log('✅ Profile created successfully, refreshing user data...')
+      console.log('✅ Complete profile created successfully via database function')
+      console.log('📍 Default pickup location created automatically:', result.data?.pickup_location_id)
+
       // Profile created successfully, refresh user data and redirect to dashboard
+      console.log('🔄 Refreshing user data...')
       await refreshUser()
       console.log('✅ User data refreshed, navigating to dashboard...')
       navigate('/dashboard')

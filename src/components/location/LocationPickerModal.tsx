@@ -43,7 +43,7 @@ export const LocationPickerModal: React.FC<LocationPickerModalProps> = ({
   const handleLocationSelect = (location: { lat: number; lng: number; address?: string }) => {
     setLocationData(prev => ({
       ...prev,
-      coords: [location.lat, location.lng],
+      coords: [location.lat, location.lng], // Store as [lat, lng] for consistency
       address: location.address || ''
     }))
     setStep('details')

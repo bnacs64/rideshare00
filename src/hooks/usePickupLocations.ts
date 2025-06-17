@@ -2,6 +2,8 @@ import { useState, useEffect } from 'react'
 import { supabase } from '../services/supabase'
 import type { PickupLocation } from '../types'
 import { useAuth } from '../contexts/AuthContext'
+import { parseCoordinates, createPostGISPoint, getDefaultCoordinates } from '../utils/coordinateUtils'
+import { profileService } from '../services/profileService'
 
 export const usePickupLocations = () => {
   const [pickupLocations, setPickupLocations] = useState<PickupLocation[]>([])
@@ -54,11 +56,11 @@ export const usePickupLocations = () => {
     }
   }
 
-  // Add a new pickup location
+  // Add a new pickup location using database function
   const addPickupLocation = async (locationData: {
     name: string
     description: string
-    coords: [number, number]
+    coords: [number, number] // Expected as [lat, lng]
     is_default?: boolean
   }) => {
     if (!user) {
@@ -66,21 +68,11 @@ export const usePickupLocations = () => {
     }
 
     try {
-      const { data, error } = await supabase
-        .from('pickup_locations')
-        .insert({
-          user_id: user.id,
-          name: locationData.name,
-          description: locationData.description,
-          coords: `POINT(${locationData.coords[0]} ${locationData.coords[1]})`,
-          is_default: locationData.is_default || false
-        })
-        .select()
-        .single()
+      const result = await profileService.addPickupLocation(user.id, locationData)
 
-      if (error) {
-        console.error('Error adding pickup location:', error)
-        return { error }
+      if (!result.success) {
+        console.error('Error adding pickup location:', result.error)
+        return { error: { message: result.error || 'Failed to add pickup location' } }
       }
 
       // Refresh the list
@@ -103,7 +95,7 @@ export const usePickupLocations = () => {
       const updateData: any = { ...updates }
       
       if (updates.coords) {
-        updateData.coords = `POINT(${updates.coords[0]} ${updates.coords[1]})`
+        updateData.coords = createPostGISPoint(updates.coords) // Use utility function for consistent conversion
       }
 
       const { data, error } = await supabase
@@ -188,26 +180,17 @@ export const usePickupLocations = () => {
         maximumAge: 60000
       })
 
-      return [location.lng, location.lat] // Note: PostGIS uses lng, lat order
+      return [location.lat, location.lng] // Return as [lat, lng] for consistency
     } catch (error) {
       console.error('Error getting current location:', error)
       return null
     }
   }
 
-  // Parse PostGIS point to coordinates array
+  // Parse PostGIS point to coordinates array using utility function
   const parseLocationCoords = (postgisPoint: any): [number, number] => {
-    if (typeof postgisPoint === 'string') {
-      // Parse "POINT(lng lat)" format
-      const match = postgisPoint.match(/POINT\(([^)]+)\)/)
-      if (match) {
-        const [lng, lat] = match[1].split(' ').map(Number)
-        return [lng, lat]
-      }
-    }
-    
-    // Fallback for other formats or if parsing fails
-    return [90.4125, 23.8103] // Default to Dhaka coordinates
+    const parsed = parseCoordinates(postgisPoint)
+    return parsed || getDefaultCoordinates() // Use utility functions for consistency
   }
 
   // Fetch locations when user changes
