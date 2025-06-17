@@ -36,7 +36,8 @@ export const ProfileSetupPage: React.FC = () => {
   useEffect(() => {
     // If user already has a complete profile (has full_name), redirect to dashboard
     if (user && user.full_name && user.full_name.trim() !== '') {
-      navigate('/dashboard')
+      console.log('User already has complete profile, redirecting to dashboard')
+      navigate('/dashboard', { replace: true })
     }
   }, [user, navigate])
 

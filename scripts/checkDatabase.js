@@ -96,7 +96,7 @@ async function checkDatabase() {
     const { data: matches, error: matchError } = await supabase
       .from('matched_rides')
       .select(`
-        id, driver_user_id, commute_date, pickup_time, status,
+        id, driver_user_id, commute_date, status,
         estimated_cost_per_person, ai_confidence_score,
         driver:users!driver_user_id(full_name, email)
       `)

@@ -29,31 +29,38 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     // Run comprehensive diagnostics on app start
     runDiagnostics()
 
-    // Get initial session with timeout
+    // Get initial session with improved timeout handling
     const getInitialSession = async () => {
       try {
         console.log('Getting initial session...')
 
-        // Add timeout to prevent infinite loading
+        // Try to get session with a shorter timeout
         const sessionPromise = supabase.auth.getSession()
         const timeoutPromise = new Promise((_, reject) =>
-          setTimeout(() => reject(new Error('Session fetch timeout')), 10000)
+          setTimeout(() => reject(new Error('Session fetch timeout')), 3000)
         )
 
-        const { data: { session } } = await Promise.race([sessionPromise, timeoutPromise]) as any
+        try {
+          const { data: { session } } = await Promise.race([sessionPromise, timeoutPromise]) as any
 
-        if (session?.user) {
-          console.log('Session found, fetching user profile...')
-          await fetchUserProfile(session.user)
-        } else {
-          console.log('No session found, setting user to null')
-          setUser(null)
+          if (session?.user) {
+            console.log('Session found, fetching user profile...')
+            await fetchUserProfile(session.user)
+          } else {
+            console.log('No session found, setting user to null')
+            setUser(null)
+          }
+        } catch (timeoutError) {
+          console.log('Session fetch timed out, auth state change will handle authentication')
+          // Don't set user to null here, let auth state change handle it
+          // This prevents conflicts between initial session and auth state change
         }
       } catch (error) {
         console.error('Error getting initial session:', error)
         setUser(null)
       } finally {
-        console.log('Setting loading to false')
+        // Always set loading to false after initial session attempt
+        console.log('Setting loading to false after initial session')
         setLoading(false)
       }
     }
@@ -65,47 +72,27 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       async (event, session) => {
         console.log('Auth state change:', event, session?.user?.email)
 
-        try {
-          if (session?.user) {
-            console.log('Auth state change: user found, fetching profile...')
-            // Only fetch profile if not already fetching
-            if (!fetchingProfile) {
-              // Add timeout for profile fetching
-              const profilePromise = fetchUserProfile(session.user)
-              const timeoutPromise = new Promise((resolve) =>
-                setTimeout(() => {
-                  console.log('Profile fetch timeout, setting user to minimal state')
-                  if (!user) { // Only set minimal state if no user is already set
-                    setUser({
-                      id: session.user.id,
-                      email: session.user.email || '',
-                      full_name: '',
-                      default_role: 'RIDER',
-                      home_location_coords: [90.4125, 23.8103],
-                      home_location_address: '',
-                      driver_details: null,
-                      telegram_user_id: null,
-                      created_at: new Date().toISOString(),
-                      updated_at: new Date().toISOString()
-                    })
-                  }
-                  resolve(null)
-                }, 12000)
-              )
-
-              await Promise.race([profilePromise, timeoutPromise])
+        // Only handle certain events to avoid conflicts
+        if (event === 'SIGNED_IN' || event === 'SIGNED_OUT' || event === 'TOKEN_REFRESHED') {
+          try {
+            if (session?.user) {
+              console.log('Auth state change: user found, fetching profile...')
+              setLoading(true) // Set loading when starting profile fetch
+              await fetchUserProfile(session.user)
+            } else {
+              console.log('Auth state change: no user, setting to null')
+              setUser(null)
+              setProfileFetched(false)
             }
-          } else {
-            console.log('Auth state change: no user, setting to null')
+          } catch (error) {
+            console.error('Error in auth state change handler:', error)
             setUser(null)
-            setProfileFetched(false)
+          } finally {
+            console.log('Auth state change: setting loading to false')
+            setLoading(false)
           }
-        } catch (error) {
-          console.error('Error in auth state change handler:', error)
-          setUser(null)
-        } finally {
-          console.log('Auth state change: setting loading to false')
-          setLoading(false)
+        } else {
+          console.log(`Auth state change: ignoring event ${event}`)
         }
       }
     )
@@ -114,23 +101,19 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   }, [])
 
   const fetchUserProfile = async (supabaseUser: SupabaseUser) => {
-    // Prevent multiple simultaneous profile fetches
-    if (fetchingProfile || profileFetched) {
-      console.log('Profile fetch already in progress or completed, skipping...')
+    // Prevent multiple simultaneous profile fetches for the same user
+    if (fetchingProfile) {
+      console.log('Profile fetch already in progress, skipping...')
       return
     }
 
     setFetchingProfile(true)
+    setProfileFetched(false) // Reset profile fetched state
+
     try {
       console.log('Fetching user profile for:', supabaseUser.email)
 
-      // Add timeout to profile fetch - increased timeout to 15 seconds
-      const profilePromise = userService.getUserProfile(supabaseUser.id)
-      const timeoutPromise = new Promise((_, reject) =>
-        setTimeout(() => reject(new Error('Profile fetch timeout')), 15000)
-      )
-
-      const { user, error } = await Promise.race([profilePromise, timeoutPromise]) as any
+      const { user, error } = await userService.getUserProfile(supabaseUser.id)
 
       if (error) {
         console.error('Error fetching user profile:', error)
@@ -138,17 +121,20 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         if ((error as any)?.code === 'PGRST116') {
           console.log('User profile not found - new user needs to complete profile setup')
           // Create a minimal user object for authenticated users without profiles
-          setUser({
+          const minimalUser = {
             id: supabaseUser.id,
             email: supabaseUser.email || '',
             full_name: '',
-            default_role: 'RIDER',
-            home_location_coords: [90.4125, 23.8103], // Default Dhaka coordinates
+            default_role: 'RIDER' as const,
+            home_location_coords: [90.4125, 23.8103] as [number, number], // Default Dhaka coordinates
+            home_location_address: '',
             driver_details: null,
             telegram_user_id: null,
             created_at: new Date().toISOString(),
             updated_at: new Date().toISOString()
-          })
+          }
+          setUser(minimalUser)
+          setProfileFetched(true) // Mark as fetched to prevent re-fetching
         } else {
           // For other errors, set user to null
           console.error('Database error, setting user to null:', error)
@@ -167,25 +153,8 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       }
     } catch (error) {
       console.error('Exception in fetchUserProfile:', error)
-
-      // If it's a timeout error, create minimal user state
-      if (error instanceof Error && error.message.includes('timeout')) {
-        console.log('Profile fetch timeout, creating minimal user state')
-        setUser({
-          id: supabaseUser.id,
-          email: supabaseUser.email || '',
-          full_name: '',
-          default_role: 'RIDER',
-          home_location_coords: [90.4125, 23.8103],
-          driver_details: null,
-          telegram_user_id: null,
-          created_at: new Date().toISOString(),
-          updated_at: new Date().toISOString()
-        })
-      } else {
-        // On other exceptions, set user to null
-        setUser(null)
-      }
+      // On exceptions, set user to null
+      setUser(null)
     } finally {
       setFetchingProfile(false)
     }
@@ -248,12 +217,21 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
   const refreshUser = async () => {
     try {
+      console.log('Refreshing user profile...')
       const { data: { user: authUser } } = await supabase.auth.getUser()
       if (authUser) {
+        // Reset profile fetched state to allow re-fetching
+        setProfileFetched(false)
         await fetchUserProfile(authUser)
+      } else {
+        console.log('No authenticated user found during refresh')
+        setUser(null)
+        setProfileFetched(false)
       }
     } catch (error) {
       console.error('Error refreshing user:', error)
+      setUser(null)
+      setProfileFetched(false)
     }
   }
 
