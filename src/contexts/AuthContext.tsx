@@ -23,6 +23,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   const [user, setUser] = useState<User | null>(null)
   const [loading, setLoading] = useState(true)
   const [fetchingProfile, setFetchingProfile] = useState(false)
+  const [profileFetched, setProfileFetched] = useState(false)
 
   useEffect(() => {
     // Run comprehensive diagnostics on app start
@@ -81,6 +82,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
                       full_name: '',
                       default_role: 'RIDER',
                       home_location_coords: [90.4125, 23.8103],
+                      home_location_address: '',
                       driver_details: null,
                       telegram_user_id: null,
                       created_at: new Date().toISOString(),
@@ -88,7 +90,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
                     })
                   }
                   resolve(null)
-                }, 8000)
+                }, 12000)
               )
 
               await Promise.race([profilePromise, timeoutPromise])
@@ -96,6 +98,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
           } else {
             console.log('Auth state change: no user, setting to null')
             setUser(null)
+            setProfileFetched(false)
           }
         } catch (error) {
           console.error('Error in auth state change handler:', error)
@@ -112,8 +115,8 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
   const fetchUserProfile = async (supabaseUser: SupabaseUser) => {
     // Prevent multiple simultaneous profile fetches
-    if (fetchingProfile) {
-      console.log('Profile fetch already in progress, skipping...')
+    if (fetchingProfile || profileFetched) {
+      console.log('Profile fetch already in progress or completed, skipping...')
       return
     }
 
@@ -121,10 +124,10 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     try {
       console.log('Fetching user profile for:', supabaseUser.email)
 
-      // Add timeout to profile fetch
+      // Add timeout to profile fetch - increased timeout to 15 seconds
       const profilePromise = userService.getUserProfile(supabaseUser.id)
       const timeoutPromise = new Promise((_, reject) =>
-        setTimeout(() => reject(new Error('Profile fetch timeout')), 8000)
+        setTimeout(() => reject(new Error('Profile fetch timeout')), 15000)
       )
 
       const { user, error } = await Promise.race([profilePromise, timeoutPromise]) as any
@@ -157,6 +160,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       if (user) {
         console.log('User profile loaded successfully:', user.email)
         setUser(user)
+        setProfileFetched(true)
       } else {
         console.log('No user data returned, setting user to null')
         setUser(null)
@@ -236,6 +240,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     try {
       await supabase.auth.signOut()
       setUser(null)
+      setProfileFetched(false)
     } catch (error) {
       console.error('Error signing out:', error)
     }

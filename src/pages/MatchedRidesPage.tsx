@@ -86,8 +86,8 @@ export const MatchedRidesPage: React.FC = () => {
 
   const getStatusBadge = (status: string) => {
     switch (status) {
-      case 'PENDING_CONFIRMATION':
-        return <Badge variant="secondary" className="bg-yellow-100 text-yellow-800">Pending Confirmation</Badge>
+      case 'PROPOSED':
+        return <Badge variant="secondary" className="bg-yellow-100 text-yellow-800">Proposed</Badge>
       case 'CONFIRMED':
         return <Badge variant="secondary" className="bg-green-100 text-green-800">Confirmed</Badge>
       case 'IN_PROGRESS':
@@ -103,7 +103,7 @@ export const MatchedRidesPage: React.FC = () => {
 
   const getParticipantStatusBadge = (status: string) => {
     switch (status) {
-      case 'PENDING':
+      case 'PENDING_ACCEPTANCE':
         return <Badge variant="outline" className="text-yellow-600 border-yellow-300">Pending</Badge>
       case 'CONFIRMED':
         return <Badge variant="outline" className="text-green-600 border-green-300">Confirmed</Badge>
@@ -132,7 +132,7 @@ export const MatchedRidesPage: React.FC = () => {
     )
   }
 
-  const pendingRides = matchedRides.filter(ride => ride.status === 'PENDING_CONFIRMATION')
+  const pendingRides = matchedRides.filter(ride => ride.status === 'PROPOSED')
   const confirmedRides = matchedRides.filter(ride => ride.status === 'CONFIRMED')
   const completedRides = matchedRides.filter(ride => ['COMPLETED', 'CANCELLED'].includes(ride.status))
 
@@ -227,7 +227,7 @@ export const MatchedRidesPage: React.FC = () => {
                                 )}
                               </div>
                               
-                              {userParticipation && userParticipation.status === 'PENDING' && (
+                              {userParticipation && userParticipation.status === 'PENDING_ACCEPTANCE' && (
                                 <div className="flex gap-2">
                                   <Button
                                     size="sm"

@@ -86,6 +86,10 @@ export interface MatchingResult {
       car_color?: string
     }
   }>
+  // Additional fields from backend response
+  goodMatches?: number
+  ridesCreated?: number
+  createdRides?: any[]
   error?: string
 }
 
@@ -179,7 +183,7 @@ Analyze all available opt-ins and create optimal ride matches. Follow these step
 
 7. **Cost Estimation**:
    - Base fare: 50 BDT
-   - Distance cost: 8 BDT per km (average Dhaka rate)
+   - Distance cost: 10 BDT per km (align with backend)
    - Divide total by number of participants for per-person cost
 
 8. **Quality Thresholds**:
@@ -690,8 +694,8 @@ Only return valid JSON. If no good matches found, return {"matches": []}.
     // Estimate time (assuming 30 km/h average speed in Dhaka traffic)
     const estimatedTime = Math.round((totalDistance / 30) * 60) // Convert to minutes
 
-    // Estimate cost (50 BDT base + 8 BDT per km)
-    const totalCost = 50 + (totalDistance * 8)
+    // Estimate cost (50 BDT base + 10 BDT per km - align with backend)
+    const totalCost = 50 + (totalDistance * 10)
     const costPerPerson = Math.round(totalCost / participants.length)
 
     return {

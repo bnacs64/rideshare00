@@ -9,7 +9,7 @@ import type { UberRouteData } from '../types'
 export interface MatchedRide {
   id: string
   commute_date: string
-  status: 'PENDING_CONFIRMATION' | 'CONFIRMED' | 'IN_PROGRESS' | 'COMPLETED' | 'CANCELLED'
+  status: 'PROPOSED' | 'CONFIRMED' | 'IN_PROGRESS' | 'COMPLETED' | 'CANCELLED'
   driver_user_id: string
   estimated_cost_per_person: number
   estimated_total_time: number
@@ -27,7 +27,7 @@ export interface RideParticipant {
   user_id: string
   daily_opt_in_id: string
   pickup_location_id: string
-  status: 'PENDING' | 'CONFIRMED' | 'DECLINED' | 'NO_RESPONSE'
+  status: 'PENDING_ACCEPTANCE' | 'CONFIRMED' | 'DECLINED' | 'NO_RESPONSE'
   confirmation_deadline: string
   created_at: string
   updated_at: string
@@ -61,7 +61,15 @@ export const matchingService = {
         return { matches: [], error: data.error || 'Matching failed' }
       }
 
-      return { matches: data.matches || [] }
+      // Backend returns additional fields: goodMatches, ridesCreated, rides
+      console.log(`Matching completed: ${data.goodMatches || 0} good matches, ${data.ridesCreated || 0} rides created`)
+
+      return {
+        matches: data.matches || [],
+        goodMatches: data.goodMatches || 0,
+        ridesCreated: data.ridesCreated || 0,
+        createdRides: data.rides || []
+      }
     } catch (error) {
       console.error('Error in findMatches:', error)
       return {
@@ -167,13 +175,13 @@ export const matchingService = {
         .from('matched_rides')
         .insert({
           commute_date: commuteDate,
-          status: 'PENDING_CONFIRMATION',
+          status: 'PROPOSED', // Align with backend status
           driver_user_id: driverParticipant.user_id,
           estimated_cost_per_person: Math.round(routeData.estimated_cost / match.participants.length),
           estimated_total_time: Math.round(routeData.duration / 60), // Convert seconds to minutes
           pickup_order: routeData.waypoints.map(wp => wp.user_id).filter(Boolean),
           route_optimization_data: routeData,
-          ai_confidence_score: match.confidence,
+          ai_confidence_score: match.confidence / 100, // Convert to decimal for database
           ai_reasoning: match.reasoning
         })
         .select()
@@ -190,7 +198,7 @@ export const matchingService = {
         user_id: participant.user_id,
         daily_opt_in_id: participant.opt_in_id,
         pickup_location_id: participant.pickup_location.id,
-        status: 'PENDING',
+        status: 'PENDING_ACCEPTANCE', // Align with backend status
         confirmation_deadline: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString() // 24 hours from now
       }))
 
