@@ -1,5 +1,5 @@
 import React from 'react'
-import { BaseMap, MapMarker } from './BaseMap'
+import { MapboxMap } from './MapboxMap'
 import { Card, CardContent, CardHeader, CardTitle } from '../ui/card'
 import { Badge } from '../ui/badge'
 import { MapPin, Home, Navigation } from 'lucide-react'
@@ -29,25 +29,58 @@ export const LocationDisplay: React.FC<LocationDisplayProps> = ({
   showLocationList = true,
   onLocationClick
 }) => {
-  // Calculate center if not provided
-  const mapCenter = center || (() => {
-    if (homeLocation) return homeLocation
-    if (locations.length > 0) return locations[0].coords
-    return [23.8103, 90.4125] // Default to Dhaka
+  // Calculate center if not provided (convert to Mapbox format [lng, lat])
+  const mapCenter = center ? [center[1], center[0]] : (() => {
+    if (homeLocation) return [homeLocation[1], homeLocation[0]]
+    if (locations.length > 0) return [locations[0].coords[1], locations[0].coords[0]]
+    return [90.4125, 23.8103] // Default to Dhaka [lng, lat]
   })()
 
-  // Calculate bounds to fit all locations
+  // Create markers for Mapbox
+  const markers = [
+    // Home location marker
+    ...(homeLocation ? [{
+      id: 'home',
+      coordinates: [homeLocation[1], homeLocation[0]] as [number, number],
+      title: 'Home Location',
+      description: 'Your registered home address',
+      type: 'home' as const
+    }] : []),
+    // Pickup location markers
+    ...locations.map((location) => ({
+      id: location.id,
+      coordinates: [location.coords[1], location.coords[0]] as [number, number],
+      title: location.name,
+      description: location.description,
+      type: location.is_default ? 'pickup' : 'pickup' as const
+    }))
+  ]
+
+  // Handle marker click
+  const handleMarkerClick = (location: { lat: number; lng: number; address?: string }) => {
+    // Find the corresponding pickup location
+    const pickupLocation = locations.find(loc =>
+      Math.abs(loc.coords[0] - location.lat) < 0.0001 &&
+      Math.abs(loc.coords[1] - location.lng) < 0.0001
+    )
+    if (pickupLocation && onLocationClick) {
+      onLocationClick(pickupLocation)
+    }
+  }
+
+  // Calculate bounds to fit all locations (not currently used)
+  /*
   const calculateBounds = () => {
     const allLocations = [
       ...(homeLocation ? [homeLocation] : []),
       ...locations.map(loc => loc.coords)
     ]
-    
+
     if (allLocations.length === 0) return null
-    
+
     const lats = allLocations.map(loc => loc[0])
     const lngs = allLocations.map(loc => loc[1])
-    
+
     return {
       north: Math.max(...lats),
       south: Math.min(...lats),
@@ -55,6 +88,7 @@ export const LocationDisplay: React.FC<LocationDisplayProps> = ({
       west: Math.min(...lngs)
     }
   }
+  */
 
   return (
     <div className={cn('space-y-4', className)}>
@@ -67,33 +101,17 @@ export const LocationDisplay: React.FC<LocationDisplayProps> = ({
           </CardTitle>
         </CardHeader>
         <CardContent>
-          <BaseMap
-            center={mapCenter}
+          <MapboxMap
+            center={mapCenter as [number, number]}
             zoom={zoom}
             height={height}
-          >
-            {/* Home Location */}
-            {homeLocation && (
-              <MapMarker
-                position={homeLocation}
-                title="Home Location"
-                description="Your registered home address"
-                icon="home"
-              />
-            )}
-            
-            {/* Pickup Locations */}
-            {locations.map((location) => (
-              <MapMarker
-                key={location.id}
-                position={location.coords}
-                title={location.name}
-                description={location.description}
-                icon="pickup"
-                onClick={() => onLocationClick?.(location)}
-              />
-            ))}
-          </BaseMap>
+            markers={markers}
+            onLocationSelect={handleMarkerClick}
+            showGeocoder={false}
+            showNavigation={true}
+            interactive={true}
+            style="mapbox://styles/mapbox/streets-v12"
+          />
         </CardContent>
       </Card>
 

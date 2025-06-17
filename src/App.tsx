@@ -21,6 +21,7 @@ import { MatchedRidesPage } from './pages/MatchedRidesPage'
 import { MatchingAdminPage } from './pages/MatchingAdminPage'
 import { RidesPage } from './pages/RidesPage'
 import { TestingPage } from './pages/TestingPage'
+import { MapboxTestPage } from './pages/MapboxTestPage'
 import { LoadingSpinner } from './components/LoadingSpinner'
 import './App.css'
 
@@ -204,6 +205,14 @@ function AppRoutes() {
           element={
             <ProtectedRoute>
               <RidesPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/mapbox-test"
+          element={
+            <ProtectedRoute>
+              <MapboxTestPage />
             </ProtectedRoute>
           }
         />

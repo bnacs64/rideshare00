@@ -1,343 +1,361 @@
-import React from 'react'
+import React, { useState, useEffect } from 'react'
 import { Link } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
 import { usePickupLocations } from '../hooks/usePickupLocations'
+import { useOptIns } from '../hooks/useOptIns'
+import { Button } from '../components/ui/button'
+import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card'
+import { Badge } from '../components/ui/badge'
+import { Alert, AlertDescription } from '../components/ui/alert'
+import {
+  Car,
+  MapPin,
+  Calendar,
+  Users,
+  Clock,
+  Plus,
+  ArrowRight,
+  // CheckCircle, // Commented out as not currently used
+  AlertTriangle,
+  TrendingUp,
+  Settings
+} from 'lucide-react'
 
 export const DashboardPage: React.FC = () => {
   const { user, signOut } = useAuth()
   const { pickupLocations, defaultPickupLocation } = usePickupLocations()
+  const { todayOptIns, loading: optInsLoading } = useOptIns()
+
+  const [currentTime, setCurrentTime] = useState(new Date())
+
+  useEffect(() => {
+    const timer = setInterval(() => setCurrentTime(new Date()), 60000)
+    return () => clearInterval(timer)
+  }, [])
+
+  const getGreeting = () => {
+    const hour = currentTime.getHours()
+    if (hour < 12) return 'Good morning'
+    if (hour < 17) return 'Good afternoon'
+    return 'Good evening'
+  }
+
+  const getNextCommute = () => {
+    const today = new Date().toISOString().split('T')[0]
+    return todayOptIns.find(opt => opt.commute_date === today)
+  }
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      <header className="bg-white shadow">
+    <div className="min-h-screen bg-gradient-to-br from-blue-50 via-indigo-50 to-purple-50">
+      {/* Modern Header */}
+      <header className="bg-white/80 backdrop-blur-md shadow-sm border-b sticky top-0 z-50">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex justify-between items-center py-6">
-            <h1 className="text-3xl font-bold text-gray-900">Dashboard</h1>
-            <div className="flex items-center space-x-4">
-              <Link
-                to="/profile"
-                className="text-gray-700 hover:text-gray-900 px-3 py-2 rounded-md text-sm font-medium"
-              >
-                Profile
-              </Link>
-              <button
-                onClick={signOut}
-                className="bg-red-600 text-white px-4 py-2 rounded-md hover:bg-red-700 transition-colors"
-              >
+          <div className="flex justify-between items-center py-4">
+            <div className="flex items-center space-x-3">
+              <div className="w-10 h-10 bg-gradient-to-br from-blue-600 to-purple-600 rounded-xl flex items-center justify-center">
+                <Car className="w-6 h-6 text-white" />
+              </div>
+              <div>
+                <h1 className="text-2xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
+                  NSU Commute
+                </h1>
+                <p className="text-sm text-muted-foreground">Dashboard</p>
+              </div>
+            </div>
+            <div className="flex items-center space-x-3">
+              <Button variant="ghost" size="sm" asChild>
+                <Link to="/profile" className="flex items-center gap-2">
+                  <Settings className="w-4 h-4" />
+                  Profile
+                </Link>
+              </Button>
+              <Button variant="outline" size="sm" onClick={signOut}>
                 Sign Out
-              </button>
+              </Button>
             </div>
           </div>
         </div>
       </header>
 
-      <main className="max-w-7xl mx-auto py-6 sm:px-6 lg:px-8">
-        <div className="px-4 py-6 sm:px-0">
+      <main className="max-w-7xl mx-auto py-8 sm:px-6 lg:px-8">
+        <div className="px-4 sm:px-0 space-y-8">
           {/* Welcome Section */}
-          <div className="bg-white overflow-hidden shadow rounded-lg mb-6">
-            <div className="px-4 py-5 sm:p-6">
-              <h2 className="text-2xl font-bold text-gray-900 mb-2">
-                Welcome back, {user?.full_name}!
-              </h2>
-              <p className="text-gray-600 mb-4">
-                You're registered as a <span className="font-semibold text-blue-600">
-                  {user?.default_role === 'DRIVER' ? 'Driver' : 'Rider'}
-                </span>
-              </p>
-
-              {/* Quick Stats */}
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-6">
-                <div className="bg-blue-50 p-4 rounded-lg">
-                  <div className="flex items-center">
-                    <div className="flex-shrink-0">
-                      <svg className="h-8 w-8 text-blue-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
-                      </svg>
+          <div className="relative">
+            <Card className="border-0 shadow-xl bg-gradient-to-r from-blue-600 to-purple-600 text-white overflow-hidden">
+              <div className="absolute inset-0 bg-black/10"></div>
+              <CardContent className="relative p-8">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <h2 className="text-3xl font-bold mb-2">
+                      {getGreeting()}, {user?.full_name}!
+                    </h2>
+                    <p className="text-blue-100 mb-4 text-lg">
+                      Ready for your next commute?
+                    </p>
+                    <div className="flex items-center gap-4">
+                      <Badge variant="secondary" className="bg-white/20 text-white border-white/30">
+                        {user?.default_role === 'DRIVER' ? '🚗 Driver' : '🎒 Rider'}
+                      </Badge>
+                      <span className="text-blue-100 text-sm">
+                        {currentTime.toLocaleDateString('en-US', {
+                          weekday: 'long',
+                          month: 'long',
+                          day: 'numeric'
+                        })}
+                      </span>
                     </div>
-                    <div className="ml-4">
-                      <p className="text-sm font-medium text-blue-600">Pickup Locations</p>
-                      <p className="text-2xl font-semibold text-blue-900">{pickupLocations.length}</p>
+                  </div>
+                  <div className="hidden md:block">
+                    <div className="w-24 h-24 bg-white/10 rounded-full flex items-center justify-center">
+                      <Car className="w-12 h-12 text-white" />
                     </div>
                   </div>
                 </div>
+              </CardContent>
+            </Card>
+          </div>
 
-                <div className="bg-green-50 p-4 rounded-lg">
-                  <div className="flex items-center">
-                    <div className="flex-shrink-0">
-                      <svg className="h-8 w-8 text-green-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-                      </svg>
-                    </div>
-                    <div className="ml-4">
-                      <p className="text-sm font-medium text-green-600">Completed Rides</p>
-                      <p className="text-2xl font-semibold text-green-900">0</p>
-                    </div>
+          {/* Quick Stats */}
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+            <Card className="border-0 shadow-lg bg-white/80 backdrop-blur-sm">
+              <CardContent className="p-6">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm font-medium text-muted-foreground">Pickup Locations</p>
+                    <p className="text-3xl font-bold text-foreground">{pickupLocations.length}</p>
+                  </div>
+                  <div className="w-12 h-12 bg-blue-100 rounded-xl flex items-center justify-center">
+                    <MapPin className="w-6 h-6 text-blue-600" />
                   </div>
                 </div>
+              </CardContent>
+            </Card>
 
-                <div className="bg-purple-50 p-4 rounded-lg">
-                  <div className="flex items-center">
-                    <div className="flex-shrink-0">
-                      <svg className="h-8 w-8 text-purple-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-                      </svg>
-                    </div>
-                    <div className="ml-4">
-                      <p className="text-sm font-medium text-purple-600">Upcoming Rides</p>
-                      <p className="text-2xl font-semibold text-purple-900">0</p>
-                    </div>
+            <Card className="border-0 shadow-lg bg-white/80 backdrop-blur-sm">
+              <CardContent className="p-6">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm font-medium text-muted-foreground">Today's Opt-ins</p>
+                    <p className="text-3xl font-bold text-foreground">{todayOptIns.length}</p>
+                  </div>
+                  <div className="w-12 h-12 bg-green-100 rounded-xl flex items-center justify-center">
+                    <Calendar className="w-6 h-6 text-green-600" />
                   </div>
                 </div>
+              </CardContent>
+            </Card>
+
+            <Card className="border-0 shadow-lg bg-white/80 backdrop-blur-sm">
+              <CardContent className="p-6">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm font-medium text-muted-foreground">Active Rides</p>
+                    <p className="text-3xl font-bold text-foreground">0</p>
+                  </div>
+                  <div className="w-12 h-12 bg-purple-100 rounded-xl flex items-center justify-center">
+                    <Car className="w-6 h-6 text-purple-600" />
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card className="border-0 shadow-lg bg-white/80 backdrop-blur-sm">
+              <CardContent className="p-6">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm font-medium text-muted-foreground">Total Savings</p>
+                    <p className="text-3xl font-bold text-foreground">৳0</p>
+                  </div>
+                  <div className="w-12 h-12 bg-orange-100 rounded-xl flex items-center justify-center">
+                    <TrendingUp className="w-6 h-6 text-orange-600" />
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+
+          {/* Next Commute & Quick Actions */}
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+            {/* Next Commute */}
+            <div className="lg:col-span-2">
+              <Card className="border-0 shadow-lg bg-white/80 backdrop-blur-sm">
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <Clock className="w-5 h-5" />
+                    Today's Commute
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  {getNextCommute() ? (
+                    <div className="space-y-4">
+                      <div className="flex items-center justify-between p-4 bg-blue-50 rounded-lg">
+                        <div className="flex items-center gap-3">
+                          <div className="w-10 h-10 bg-blue-100 rounded-full flex items-center justify-center">
+                            <Calendar className="w-5 h-5 text-blue-600" />
+                          </div>
+                          <div>
+                            <p className="font-medium">Opt-in Active</p>
+                            <p className="text-sm text-muted-foreground">
+                              {getNextCommute()?.time_window_start} - {getNextCommute()?.time_window_end}
+                            </p>
+                          </div>
+                        </div>
+                        <Badge variant="secondary" className="bg-blue-100 text-blue-800">
+                          {getNextCommute()?.status}
+                        </Badge>
+                      </div>
+                      <div className="flex gap-3">
+                        <Button asChild className="flex-1">
+                          <Link to="/matched-rides">
+                            View Matches
+                            <ArrowRight className="w-4 h-4 ml-2" />
+                          </Link>
+                        </Button>
+                        <Button variant="outline" asChild>
+                          <Link to="/opt-in-status">
+                            Manage
+                          </Link>
+                        </Button>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="text-center py-8">
+                      <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                        <Plus className="w-8 h-8 text-gray-400" />
+                      </div>
+                      <h3 className="text-lg font-medium mb-2">No commute planned</h3>
+                      <p className="text-muted-foreground mb-6">
+                        Create an opt-in to find ride matches for today
+                      </p>
+                      <Button asChild size="lg" className="shadow-lg">
+                        <Link to="/opt-in">
+                          <Plus className="w-4 h-4 mr-2" />
+                          Find a Ride
+                        </Link>
+                      </Button>
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            </div>
+
+            {/* Quick Actions */}
+            <div className="space-y-4">
+              <h3 className="text-lg font-semibold">Quick Actions</h3>
+              <div className="space-y-3">
+                <Button asChild variant="outline" className="w-full justify-start h-auto p-4">
+                  <Link to="/scheduled-opt-ins" className="flex items-center gap-3">
+                    <div className="w-10 h-10 bg-indigo-100 rounded-lg flex items-center justify-center">
+                      <Calendar className="w-5 h-5 text-indigo-600" />
+                    </div>
+                    <div className="text-left">
+                      <p className="font-medium">Scheduled Rides</p>
+                      <p className="text-sm text-muted-foreground">Set up recurring</p>
+                    </div>
+                  </Link>
+                </Button>
+
+                <Button asChild variant="outline" className="w-full justify-start h-auto p-4">
+                  <Link to="/matched-rides" className="flex items-center gap-3">
+                    <div className="w-10 h-10 bg-teal-100 rounded-lg flex items-center justify-center">
+                      <Users className="w-5 h-5 text-teal-600" />
+                    </div>
+                    <div className="text-left">
+                      <p className="font-medium">My Rides</p>
+                      <p className="text-sm text-muted-foreground">View matches</p>
+                    </div>
+                  </Link>
+                </Button>
+
+                <Button asChild variant="outline" className="w-full justify-start h-auto p-4">
+                  <Link to="/locations" className="flex items-center gap-3">
+                    <div className="w-10 h-10 bg-orange-100 rounded-lg flex items-center justify-center">
+                      <MapPin className="w-5 h-5 text-orange-600" />
+                    </div>
+                    <div className="text-left">
+                      <p className="font-medium">Locations</p>
+                      <p className="text-sm text-muted-foreground">Manage pickup spots</p>
+                    </div>
+                  </Link>
+                </Button>
+
+                <Button asChild variant="outline" className="w-full justify-start h-auto p-4 border-blue-200 bg-blue-50">
+                  <Link to="/mapbox-test" className="flex items-center gap-3">
+                    <div className="w-10 h-10 bg-blue-100 rounded-lg flex items-center justify-center">
+                      <MapPin className="w-5 h-5 text-blue-600" />
+                    </div>
+                    <div className="text-left">
+                      <p className="font-medium text-blue-700">🗺️ Mapbox Test</p>
+                      <p className="text-sm text-blue-600">New map experience</p>
+                    </div>
+                  </Link>
+                </Button>
               </div>
             </div>
           </div>
 
-          {/* Quick Actions */}
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-6">
-            <Link
-              to="/opt-in"
-              className="bg-white overflow-hidden shadow rounded-lg hover:shadow-md transition-shadow"
-            >
-              <div className="px-4 py-5 sm:p-6">
-                <div className="flex items-center">
-                  <div className="flex-shrink-0">
-                    <div className="flex items-center justify-center h-12 w-12 rounded-md bg-blue-500 text-white">
-                      <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
-                      </svg>
-                    </div>
-                  </div>
-                  <div className="ml-4">
-                    <h3 className="text-lg font-medium text-gray-900">Find a Ride</h3>
-                    <p className="text-sm text-gray-500">Opt-in for today's commute</p>
-                  </div>
-                </div>
-              </div>
-            </Link>
 
-            <Link
-              to="/scheduled-opt-ins"
-              className="bg-white overflow-hidden shadow rounded-lg hover:shadow-md transition-shadow"
-            >
-              <div className="px-4 py-5 sm:p-6">
-                <div className="flex items-center">
-                  <div className="flex-shrink-0">
-                    <div className="flex items-center justify-center h-12 w-12 rounded-md bg-indigo-500 text-white">
-                      <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                      </svg>
-                    </div>
-                  </div>
-                  <div className="ml-4">
-                    <h3 className="text-lg font-medium text-gray-900">Scheduled Rides</h3>
-                    <p className="text-sm text-gray-500">Set up recurring schedules</p>
-                  </div>
-                </div>
-              </div>
-            </Link>
-
-            <Link
-              to="/opt-in-status"
-              className="bg-white overflow-hidden shadow rounded-lg hover:shadow-md transition-shadow"
-            >
-              <div className="px-4 py-5 sm:p-6">
-                <div className="flex items-center">
-                  <div className="flex-shrink-0">
-                    <div className="flex items-center justify-center h-12 w-12 rounded-md bg-green-500 text-white">
-                      <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-                      </svg>
-                    </div>
-                  </div>
-                  <div className="ml-4">
-                    <h3 className="text-lg font-medium text-gray-900">Opt-in Status</h3>
-                    <p className="text-sm text-gray-500">View and manage opt-ins</p>
-                  </div>
-                </div>
-              </div>
-            </Link>
-
-            <Link
-              to="/matched-rides"
-              className="bg-white overflow-hidden shadow rounded-lg hover:shadow-md transition-shadow"
-            >
-              <div className="px-4 py-5 sm:p-6">
-                <div className="flex items-center">
-                  <div className="flex-shrink-0">
-                    <div className="flex items-center justify-center h-12 w-12 rounded-md bg-teal-500 text-white">
-                      <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
-                      </svg>
-                    </div>
-                  </div>
-                  <div className="ml-4">
-                    <h3 className="text-lg font-medium text-gray-900">Matched Rides</h3>
-                    <p className="text-sm text-gray-500">View and manage matches</p>
-                  </div>
-                </div>
-              </div>
-            </Link>
-
-            <Link
-              to="/rides"
-              className="bg-white overflow-hidden shadow rounded-lg hover:shadow-md transition-shadow"
-            >
-              <div className="px-4 py-5 sm:p-6">
-                <div className="flex items-center">
-                  <div className="flex-shrink-0">
-                    <div className="flex items-center justify-center h-12 w-12 rounded-md bg-slate-500 text-white">
-                      <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v10a2 2 0 002 2h8a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
-                      </svg>
-                    </div>
-                  </div>
-                  <div className="ml-4">
-                    <h3 className="text-lg font-medium text-gray-900">Ride History</h3>
-                    <p className="text-sm text-gray-500">View past rides</p>
-                  </div>
-                </div>
-              </div>
-            </Link>
-
-            <Link
-              to="/locations"
-              className="bg-white overflow-hidden shadow rounded-lg hover:shadow-md transition-shadow"
-            >
-              <div className="px-4 py-5 sm:p-6">
-                <div className="flex items-center">
-                  <div className="flex-shrink-0">
-                    <div className="flex items-center justify-center h-12 w-12 rounded-md bg-orange-500 text-white">
-                      <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
-                      </svg>
-                    </div>
-                  </div>
-                  <div className="ml-4">
-                    <h3 className="text-lg font-medium text-gray-900">Locations</h3>
-                    <p className="text-sm text-gray-500">Manage pickup locations</p>
-                  </div>
-                </div>
-              </div>
-            </Link>
-
-            <Link
-              to="/matching-test"
-              className="bg-white overflow-hidden shadow rounded-lg hover:shadow-md transition-shadow"
-            >
-              <div className="px-4 py-5 sm:p-6">
-                <div className="flex items-center">
-                  <div className="flex-shrink-0">
-                    <div className="flex items-center justify-center h-12 w-12 rounded-md bg-purple-500 text-white">
-                      <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
-                      </svg>
-                    </div>
-                  </div>
-                  <div className="ml-4">
-                    <h3 className="text-lg font-medium text-gray-900">AI Matching Test</h3>
-                    <p className="text-sm text-gray-500">Test Gemini AI integration</p>
-                  </div>
-                </div>
-              </div>
-            </Link>
-
-            <Link
-              to="/matching-admin"
-              className="bg-white overflow-hidden shadow rounded-lg hover:shadow-md transition-shadow"
-            >
-              <div className="px-4 py-5 sm:p-6">
-                <div className="flex items-center">
-                  <div className="flex-shrink-0">
-                    <div className="flex items-center justify-center h-12 w-12 rounded-md bg-red-500 text-white">
-                      <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                      </svg>
-                    </div>
-                  </div>
-                  <div className="ml-4">
-                    <h3 className="text-lg font-medium text-gray-900">Matching Admin</h3>
-                    <p className="text-sm text-gray-500">Manage background matching</p>
-                  </div>
-                </div>
-              </div>
-            </Link>
-
-            <Link
-              to="/profile"
-              className="bg-white overflow-hidden shadow rounded-lg hover:shadow-md transition-shadow"
-            >
-              <div className="px-4 py-5 sm:p-6">
-                <div className="flex items-center">
-                  <div className="flex-shrink-0">
-                    <div className="flex items-center justify-center h-12 w-12 rounded-md bg-gray-500 text-white">
-                      <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
-                      </svg>
-                    </div>
-                  </div>
-                  <div className="ml-4">
-                    <h3 className="text-lg font-medium text-gray-900">Profile</h3>
-                    <p className="text-sm text-gray-500">Manage your profile</p>
-                  </div>
-                </div>
-              </div>
-            </Link>
-          </div>
 
           {/* Setup Reminders */}
-          {pickupLocations.length === 0 && (
-            <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4 mb-6">
-              <div className="flex">
-                <div className="flex-shrink-0">
-                  <svg className="h-5 w-5 text-yellow-400" viewBox="0 0 20 20" fill="currentColor">
-                    <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
-                  </svg>
-                </div>
-                <div className="ml-3">
-                  <h3 className="text-sm font-medium text-yellow-800">
-                    Complete your setup
-                  </h3>
-                  <div className="mt-2 text-sm text-yellow-700">
-                    <p>
-                      You haven't added any pickup locations yet.
-                      <Link to="/locations" className="font-medium underline hover:text-yellow-600 ml-1">
-                        Add pickup locations
-                      </Link> to start finding rides.
-                    </p>
+          {(pickupLocations.length === 0 || !user?.telegram_user_id) && (
+            <Alert className="border-amber-200 bg-amber-50">
+              <AlertTriangle className="w-4 h-4 text-amber-600" />
+              <AlertDescription className="text-amber-800">
+                <div className="space-y-2">
+                  <p className="font-medium">Complete your setup to start finding rides:</p>
+                  <div className="space-y-1 text-sm">
+                    {pickupLocations.length === 0 && (
+                      <div className="flex items-center gap-2">
+                        <div className="w-2 h-2 bg-amber-500 rounded-full"></div>
+                        <span>
+                          <Link to="/locations" className="font-medium underline hover:text-amber-600">
+                            Add pickup locations
+                          </Link>
+                        </span>
+                      </div>
+                    )}
+                    {!user?.telegram_user_id && (
+                      <div className="flex items-center gap-2">
+                        <div className="w-2 h-2 bg-amber-500 rounded-full"></div>
+                        <span>
+                          <Link to="/profile" className="font-medium underline hover:text-amber-600">
+                            Set up Telegram notifications
+                          </Link>
+                        </span>
+                      </div>
+                    )}
                   </div>
                 </div>
-              </div>
-            </div>
+              </AlertDescription>
+            </Alert>
           )}
 
           {/* Recent Activity */}
-          <div className="bg-white shadow rounded-lg">
-            <div className="px-4 py-5 sm:p-6">
-              <h3 className="text-lg leading-6 font-medium text-gray-900 mb-4">
+          <Card className="border-0 shadow-lg bg-white/80 backdrop-blur-sm">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Clock className="w-5 h-5" />
                 Recent Activity
-              </h3>
-              <div className="text-center py-8">
-                <svg className="mx-auto h-12 w-12 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v10a2 2 0 002 2h8a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
-                </svg>
-                <h3 className="mt-2 text-sm font-medium text-gray-900">No recent activity</h3>
-                <p className="mt-1 text-sm text-gray-500">
-                  Start by opting in for a ride to see your activity here.
-                </p>
-                <div className="mt-6">
-                  <Link
-                    to="/opt-in"
-                    className="inline-flex items-center px-4 py-2 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700"
-                  >
-                    Find a Ride
-                  </Link>
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="text-center py-12">
+                <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                  <Clock className="w-8 h-8 text-gray-400" />
                 </div>
+                <h3 className="text-lg font-medium text-gray-900 mb-2">No recent activity</h3>
+                <p className="text-muted-foreground mb-6 max-w-sm mx-auto">
+                  Your ride history and activity will appear here once you start using NSU Commute.
+                </p>
+                <Button asChild size="lg" className="shadow-lg">
+                  <Link to="/opt-in">
+                    <Plus className="w-4 h-4 mr-2" />
+                    Get Started
+                  </Link>
+                </Button>
               </div>
-            </div>
-          </div>
+            </CardContent>
+          </Card>
         </div>
       </main>
     </div>
